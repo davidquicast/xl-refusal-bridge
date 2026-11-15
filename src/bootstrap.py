@@ -46,6 +46,9 @@ def heartbeat():
         upload_log()
 
 
+# A relaunch must not race a previous run that survived an interrupted cell.
+subprocess.run("pkill -f 'xlrb.cl[i]'", shell=True)
+time.sleep(3)
 open(LOG, "a").write(f"[bootstrap] session {SESSION} start {time.strftime('%FT%TZ', time.gmtime())}\n")
 threading.Thread(target=heartbeat, daemon=True).start()
 if SESSION == "b":
