@@ -1,6 +1,7 @@
 # Defaults (mirrors xlrb.common.Cfg). Pass with --config to override.
 model_id: CohereLabs/tiny-aya-global
-judge_id: ToxicityPrompts/PolyGuard-Qwen
+judge_id: Qwen/Qwen2.5-7B-Instruct
+judge2_id: ToxicityPrompts/PolyGuard-Qwen-Smol
 mt_id: facebook/nllb-200-distilled-1.3B
 seed: 0
 n_train: 115

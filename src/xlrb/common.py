@@ -42,7 +42,8 @@ POLYGUARD_LANGS = {"en", "zh", "it", "ar", "ko", "th"}
 class Cfg:
     hf_user: str = os.environ.get("XLRB_HF_USER", "")
     model_id: str = os.environ.get("XLRB_MODEL", "CohereLabs/tiny-aya-global")
-    judge_id: str = "ToxicityPrompts/PolyGuard-Qwen"
+    judge_id: str = os.environ.get("XLRB_JUDGE", "Qwen/Qwen2.5-7B-Instruct")
+    judge2_id: str = "ToxicityPrompts/PolyGuard-Qwen-Smol"   # second opinion on refusal only
     mt_id: str = "facebook/nllb-200-distilled-1.3B"
     seed: int = 0
     n_train: int = 115

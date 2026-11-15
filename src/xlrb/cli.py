@@ -55,8 +55,8 @@ class Session:
             from .judge import Judge
 
             if torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory < 30 * 2**30:
-                print("[warn] < 30 GB VRAM: using the small PolyGuard judge (recorded in run.json)")
-                self.cfg.judge_id = "ToxicityPrompts/PolyGuard-Qwen-Smol"
+                print("[warn] < 30 GB VRAM: using a smaller rubric judge (recorded in run.json)")
+                self.cfg.judge_id = "Qwen/Qwen2.5-3B-Instruct"
 
             self._judge = Judge(self.cfg)
         return self._judge

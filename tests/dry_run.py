@@ -44,7 +44,7 @@ class StubTr:
 
 
 class StubJudge:
-    def __call__(self, prompts, responses):
+    def __call__(self, prompts, responses, second=True):
         out = []
         for p, r in zip(prompts, responses):
             h = hash((p, r)) % 4

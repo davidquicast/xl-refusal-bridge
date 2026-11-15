@@ -102,11 +102,12 @@ def paired(base: list[dict], cand: list[dict], key: str = "harmful_response", la
 def judge_agreement(rows: list[dict]) -> dict:
     """Agreement between the English-pivot verdict and the native-language verdict."""
     out = {}
-    for key, nkey in (("refusal", "native_refusal"), ("harmful_response", "native_harmful_response")):
+    for key, nkey in (("refusal", "native_refusal"), ("harmful_response", "native_harmful_response"),
+                      ("refusal", "pg_refusal")):
         v = [(bool(r[key]), bool(r[nkey])) for r in rows if r.get(nkey) is not None and r.get(key) is not None]
         if v:
             a = np.array(v)
             po = float((a[:, 0] == a[:, 1]).mean())
             pe = float(a[:, 0].mean() * a[:, 1].mean() + (1 - a[:, 0].mean()) * (1 - a[:, 1].mean()))
-            out[key] = {"n": len(v), "agreement": po, "kappa": (po - pe) / (1 - pe + 1e-12)}
+            out[f"{key}_vs_{nkey}"] = {"n": len(v), "agreement": po, "kappa": (po - pe) / (1 - pe + 1e-12)}
     return out
