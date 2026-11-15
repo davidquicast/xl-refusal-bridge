@@ -145,7 +145,7 @@ def _dl(repo: str, filename: str) -> str:
     return hf_hub_download(repo, filename, repo_type="dataset")
 
 
-def load_sources(seed: int, n_benign_pool: int = 380) -> dict[str, list[dict]]:
+def load_sources(seed: int, n_benign_pool: int = 600) -> dict[str, list[dict]]:
     import pandas as pd
 
     mj = pd.read_csv(_dl("DAMO-NLP-SG/MultiJail", "MultiJail.csv"), encoding="utf-8-sig")

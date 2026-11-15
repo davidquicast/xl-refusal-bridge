@@ -42,7 +42,7 @@ class Cfg:
     n_val: int = 50
     n_test: int = 150
     n_xstest_val: int = 50
-    bt_chrf_min: float = 30.0
+    bt_chrf_min: float = 25.0
     max_new_tokens: int = 128
     gen_batch: int = 32
     act_batch: int = 32

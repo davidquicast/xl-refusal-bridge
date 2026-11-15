@@ -96,7 +96,7 @@ def curate(raw_path: Path, out_dir: Path) -> dict:
     n = lambda lab: len({r["prompt_id"] for r in rows if r["label"] == lab})  # noqa: E731
     (out_dir / "README.md").write_text(BENCH_CARD.format(
         n_h=n("harmful"), n_b=n("benign"), n_x=n("xstest_safe"), mt=stats.get("mt_model", "?"),
-        bt=stats.get("bt_model", "?"), chrf=30, dropped=stats.get("dropped", {}), ck=json.dumps(info)))
+        bt=stats.get("bt_model", "?"), chrf=25, dropped=stats.get("dropped", {}), ck=json.dumps(info)))
     info["rows"] = len(rows)
     return info
 
