@@ -105,6 +105,12 @@ def load_cfg(path: str | None = None) -> Cfg:
 # ----------------------------------------------------------------------------- Hub bus
 # XLRB_BUS_DIR switches the bus to a local directory (offline dry runs and tests).
 BUS_DIR = os.environ.get("XLRB_BUS_DIR")
+# XLRB_NS prefixes every path on the ops bus, so a smoke test cannot mark real stages as done.
+NS = os.environ.get("XLRB_NS", "")
+
+
+def _ns(path_in_repo: str, repo: str | None) -> str:
+    return f"ns/{NS}/{path_in_repo}" if NS and repo is None else path_in_repo
 
 
 def _bus_path(cfg: "Cfg", repo: str | None, path_in_repo: str) -> Path:
@@ -126,6 +132,7 @@ def ensure_repo(repo_id: str, repo_type: str = "dataset", private: bool = True) 
 def push(cfg: Cfg, local: str | Path, path_in_repo: str, repo: str | None = None,
          repo_type: str = "dataset", msg: str | None = None) -> None:
     local = Path(local)
+    path_in_repo = _ns(path_in_repo, repo)
     if BUS_DIR:
         import shutil
 
@@ -156,6 +163,7 @@ def push(cfg: Cfg, local: str | Path, path_in_repo: str, repo: str | None = None
 
 def pull(cfg: Cfg, path_in_repo: str, repo: str | None = None, repo_type: str = "dataset") -> Path:
     """Download a file or a folder prefix from the bus into the work dir; returns the local path."""
+    path_in_repo = _ns(path_in_repo, repo)
     if BUS_DIR:
         return _bus_path(cfg, repo, path_in_repo)
     from huggingface_hub import snapshot_download
@@ -168,6 +176,7 @@ def pull(cfg: Cfg, path_in_repo: str, repo: str | None = None, repo_type: str = 
 
 
 def exists(cfg: Cfg, path_in_repo: str, repo: str | None = None, repo_type: str = "dataset") -> bool:
+    path_in_repo = _ns(path_in_repo, repo)
     if BUS_DIR:
         return _bus_path(cfg, repo, path_in_repo).exists()
     try:
@@ -320,12 +329,10 @@ def encode(tok, prompts: list[str], device="cpu"):
 
 
 def load_bench(cfg: Cfg) -> list[dict]:
-    """Bench rows from the local work dir, else from the Hub dataset repo."""
+    """Bench rows from the local work dir, else from the ops bus."""
     local = Path(cfg.work, "bench", "bench.jsonl")
     if not local.exists():
-        from huggingface_hub import hf_hub_download
-
-        src = hf_hub_download(cfg.bench_repo, "bench.jsonl", repo_type="dataset")
+        src = pull(cfg, "bench/bench.jsonl")
         local.parent.mkdir(parents=True, exist_ok=True)
         local.write_bytes(Path(src).read_bytes())
     return read_jsonl(local)

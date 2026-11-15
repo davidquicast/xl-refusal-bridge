@@ -34,6 +34,7 @@ for label, n in (("harmful", 26), ("benign", 26), ("xstest_safe", 12)):
                          "label": label, "split": split, "text": en if l == "en" else f"{l} {en}", "text_en": en})
 bench = Path(cfg.work, "bench", "bench.jsonl")
 write_jsonl(bench, rows)
+push(cfg, bench, "bench/bench.jsonl")
 push(cfg, bench, "done/bench.json")          # mark the bench stage as done on the local bus
 
 

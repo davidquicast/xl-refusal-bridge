@@ -72,7 +72,6 @@ def stage(cfg: Cfg, name: str, force: bool = False) -> bool:
 
 # ----------------------------------------------------------------------------- bench (local)
 def do_bench(cfg: Cfg, limit: int | None = None, public: bool = False, S=None):
-    from .common import ensure_repo
     from .data import build
     from .kits import curate
 
@@ -85,11 +84,11 @@ def do_bench(cfg: Cfg, limit: int | None = None, public: bool = False, S=None):
         stats = build(cfg, out, limit=limit, mt=NllbMT(cfg, S.tr) if S is not None else None)
         rec["metrics"]["build"] = stats
         rec["metrics"]["curatorkit"] = curate(out / "bench_raw.jsonl", out)
-        ensure_repo(cfg.bench_repo, private=not public)
-        for f in ("bench.jsonl", "build_stats.json", "README.md"):
-            push(cfg, out / f, f, repo=cfg.bench_repo, msg=f"feat: add {f}")
+        # The bench lives on the private bus; the publish step copies it to the public dataset repo.
+        for f in ("bench.jsonl", "bench_raw.jsonl", "build_stats.json", "README.md"):
+            push(cfg, out / f, f"bench/{f}")
         if (out / "curatorkit").exists():
-            push(cfg, out / "curatorkit", "curatorkit", repo=cfg.bench_repo, msg="feat: add CuratorKIT provenance")
+            push(cfg, out / "curatorkit", "bench/curatorkit")
 
 
 # ----------------------------------------------------------------------------- acts + fit
@@ -402,6 +401,13 @@ def main():
     cfg = load_cfg(a.config)
     if a.model:
         cfg.model_id = a.model
+    if a.quick:
+        import os
+
+        assert os.environ.get("XLRB_NS"), "--quick needs XLRB_NS so it cannot mark real stages as done"
+        cfg.n_train, cfg.n_val, cfg.n_test, cfg.n_xstest_val = 12, 6, 6, 6
+        cfg.ld_grid, cfg.beta_grid, cfg.lam_grid, cfg.c_grid = [8, 16], [1.0], [1e-2], [1.0]
+        cfg.max_new_tokens = 48
     if a.stage == "bench":
         do_bench(cfg, a.limit, a.public)
     elif a.stage == "acts":
