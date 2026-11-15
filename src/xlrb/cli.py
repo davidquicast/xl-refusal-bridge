@@ -295,6 +295,81 @@ def variants(cfg: Cfg, spec: BridgeSpec, w, r) -> dict:
     }
 
 
+# ----------------------------------------------------------------------------- out-of-distribution test
+OOD_REPO = "tiny-aya-safety/sorry-bench-202503-multilingual"
+OOD_UNSEEN = ["de", "es", "fr", "hi", "ja", "ru"]      # never seen by the probe or the direction
+OOD_SEEN = ["en", "ar", "bn", "zh"]
+
+
+def do_ood(cfg: Cfg, S: Session, n: int = 100):
+    """Generalisation test on a different harmful-prompt source (SORRY-Bench, machine-translated,
+    44 harm categories) and on six languages that were never used to fit anything.
+
+    Activation level: does the frozen gate fire? Behaviour level (unseen languages only): base vs
+    bridge, same judge. Nothing is tuned here; the bridge is used exactly as selected on MultiJail val.
+    """
+    import random
+
+    import pandas as pd
+    import torch
+    from huggingface_hub import hf_hub_download
+
+    from .common import encode
+    from .metrics import paired, summarize
+
+    name = f"ood_{cfg.tag}"
+    if not stage(cfg, name):
+        return
+    with run(cfg, name) as rec:
+        df = pd.read_parquet(hf_hub_download(OOD_REPO, "data/train-00000-of-00001.parquet", repo_type="dataset"))
+        df = df[df["prompt_style"] == "base"].copy()
+        df["text"] = df["turns"].map(lambda t: str(t[0]).strip() if t is not None and len(t) else "")
+        en = df[df["language"] == "en"].drop_duplicates("question_id").set_index("question_id")
+        qids = sorted(int(q) for q in en.index if en.loc[q, "text"])
+        random.Random(cfg.seed).shuffle(qids)
+        qids = set(qids[:n])
+        rows = []
+        for l in OOD_UNSEEN + OOD_SEEN:
+            sub_ = df[(df["language"] == l) & df["question_id"].isin(qids) & (df["text"] != "")]
+            for _, r in sub_.drop_duplicates("question_id").iterrows():
+                q = int(r["question_id"])
+                rows.append({"id": f"sb{q}_{l}", "prompt_id": f"sb{q}", "lang": l, "label": "harmful",
+                             "tier": "unseen" if l in OOD_UNSEEN else "seen", "text": r["text"],
+                             "text_en": en.loc[q, "text"], "category": int(r["category"]), "split": "ood"})
+        model, tok = S.lm
+        spec, w, r = final_bridge(cfg, model)
+        dev = next(model.parameters()).device
+        wt = torch.tensor(w, dtype=torch.float32, device=dev)
+        for s in range(0, len(rows), cfg.act_batch):
+            chunk = rows[s: s + cfg.act_batch]
+            with torch.no_grad():
+                hs = model(**encode(tok, [x["text"] for x in chunk], dev), output_hidden_states=True).hidden_states
+            sc = (hs[spec.L_d + 1][:, -1].float() @ wt).cpu().tolist()
+            for x, v in zip(chunk, sc):
+                x["probe_score"], x["gate_act"] = v, float(v > spec.tau)
+        gate = {l: float(sum(x["gate_act"] for x in rows if x["lang"] == l) / max(1, sum(x["lang"] == l for x in rows)))
+                for l in OOD_UNSEEN + OOD_SEEN}
+        unseen = [x for x in rows if x["lang"] in OOD_UNSEEN]
+        base = evaluate(cfg, S, [dict(x) for x in unseen], None)
+        brd = evaluate(cfg, S, [dict(x) for x in unseen], Bridge(model, spec, w, r))
+        out = cfg.wdir("eval", cfg.tag, "ood", "x").parent
+        write_jsonl(out / "ood_gate.jsonl", rows)
+        write_jsonl(out / "ood_base.jsonl", base)
+        write_jsonl(out / "ood_bridge.jsonl", brd)
+        sb, st = summarize(base), summarize(brd)
+        res = {"source": OOD_REPO, "prompt_style": "base", "n_prompts": len(qids), "gate_rate_harmful": gate,
+               "base": sb, "bridge": st, "paired_asr": paired(base, brd, "harmful_response", "harmful"),
+               "paired_refusal": paired(base, brd, "refusal", "harmful")}
+        (out / "ood.json").write_text(json.dumps(res, indent=2))
+        push(cfg, out, f"eval/{cfg.tag}/ood")
+        push(cfg, out / "ood.json", f"results/{cfg.tag}/ood.json")
+        rec["metrics"] = {"gate_rate_harmful": gate, "asr_base": {l: d["asr"] for l, d in sb["per_lang"].items()},
+                          "asr_bridge": {l: d["asr"] for l, d in st["per_lang"].items()},
+                          "rr_base": {l: d["rr"] for l, d in sb["per_lang"].items()},
+                          "rr_bridge": {l: d["rr"] for l, d in st["per_lang"].items()},
+                          "asr_macro": [sb["asr_macro"], st["asr_macro"]]}
+
+
 # ----------------------------------------------------------------------------- report
 def do_report(cfg: Cfg):
     from .metrics import judge_agreement, paired, summarize
@@ -391,7 +466,7 @@ def run_b(cfg: Cfg, quick: bool = False):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("stage", choices=["bench", "acts", "fit", "tune", "report", "run_a", "run_b"])
+    ap.add_argument("stage", choices=["bench", "acts", "fit", "tune", "report", "ood", "run_a", "run_b"])
     ap.add_argument("--config", default=None)
     ap.add_argument("--model", default=None)
     ap.add_argument("--limit", type=int, default=None)
@@ -418,6 +493,8 @@ def main():
         do_tune(cfg, Session(cfg))
     elif a.stage == "report":
         do_report(cfg)
+    elif a.stage == "ood":
+        do_ood(cfg, Session(cfg), n=a.limit or 100)
     elif a.stage == "run_a":
         run_a(cfg, a.quick)
     elif a.stage == "run_b":

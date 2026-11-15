@@ -1,0 +1,17 @@
+# Defaults (mirrors xlrb.common.Cfg). Pass with --config to override.
+model_id: CohereLabs/tiny-aya-global
+judge_id: ToxicityPrompts/PolyGuard-Qwen
+mt_id: facebook/nllb-200-distilled-1.3B
+seed: 0
+n_train: 115
+n_val: 50
+n_test: 150
+n_xstest_val: 50
+bt_chrf_min: 25.0
+max_new_tokens: 128
+gate_fpr: 0.02
+ld_grid: [6, 8, 10, 12, 14, 16, 18, 20, 22, 24]
+lr_range: [14, 30]
+beta_grid: [0.0, 1.0, 10.0]
+lam_grid: [0.001, 0.01, 0.1]
+c_grid: [0.75, 1.0, 1.25, 1.5]

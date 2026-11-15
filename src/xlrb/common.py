@@ -26,6 +26,13 @@ LANGS: dict[str, dict[str, str]] = {
     "jv": {"name": "Javanese", "nllb": "jav_Latn", "belebele": "jav_Latn", "tier": "low"},
 }
 LANG_CODES = list(LANGS)
+# Languages that are never used for fitting; they only appear in the out-of-distribution test.
+EXTRA_NLLB = {"de": "deu_Latn", "es": "spa_Latn", "fr": "fra_Latn", "hi": "hin_Deva", "ja": "jpn_Jpan",
+              "ru": "rus_Cyrl"}
+
+
+def nllb_code(lang: str) -> str:
+    return LANGS[lang]["nllb"] if lang in LANGS else EXTRA_NLLB[lang]
 LABELS = ("harmful", "benign", "xstest_safe")
 # Languages the PolyGuard judge was trained on (used for the native-language cross-check).
 POLYGUARD_LANGS = {"en", "zh", "it", "ar", "ko", "th"}
