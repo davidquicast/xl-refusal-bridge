@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xlrb"
+version = "0.1.0"
+description = "Cross-lingual gated refusal bridge for Tiny Aya (Lexsi AI Safety and Alignment Hackathon, Track 2)"
+requires-python = ">=3.10"
+dependencies = ["numpy", "pandas", "pyarrow", "pyyaml", "safetensors", "huggingface_hub", "sacrebleu",
+                "torch", "transformers", "sentencepiece", "protobuf"]
+
+[project.optional-dependencies]
+kits = ["safetune", "circuitkit", "auditkit[transformers]", "curatorkit"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Conventional Commits subject + human-only authorship.
+msg_file="$1"
+subject="$(grep -v '^#' "$msg_file" | head -n1)"
+if ! echo "$subject" | grep -Eq '^(feat|fix|docs|chore|refactor|test|perf|build|ci)(\([a-z0-9-]+\))?: .{1,72}$'; then
+  echo "commit-msg: subject must match '<type>(<scope>): <summary>' (Conventional Commits)." >&2; exit 1
+fi
+if grep -v '^#' "$msg_file" | grep -Eiq 'co-authored-by|generated with|claude|anthropic|noreply@anthropic'; then
+  echo "commit-msg: AI attribution is not allowed in this repository." >&2; exit 1
+fi

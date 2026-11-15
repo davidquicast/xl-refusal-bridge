@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Leak scan on staged content: tokens, private paths, ops repo name, notebook outputs.
+fail=0
+files=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$files" ] && exit 0
+pat='hf_[A-Za-z0-9]{30,}|/home/[a-z]+/|/content/drive|xl-refusal-bridge-ops|COHERE_API_KEY=|[A-Za-z0-9._%+-]+@gmail\.com'
+for f in $files; do
+  case "$f" in .githooks/*) continue;; esac
+  if git show ":$f" | grep -EnI "$pat" >/dev/null; then
+    echo "pre-commit: possible private data in $f:" >&2; git show ":$f" | grep -EnI "$pat" | head -3 >&2; fail=1
+  fi
+  case "$f" in *.ipynb)
+    if git show ":$f" | python3 -c "import sys,json; nb=json.load(sys.stdin); sys.exit(any(c.get('outputs') for c in nb['cells'] if c['cell_type']=='code'))"; then :; else
+      echo "pre-commit: notebook $f has outputs; clear them first." >&2; fail=1; fi;;
+  esac
+done
+exit $fail

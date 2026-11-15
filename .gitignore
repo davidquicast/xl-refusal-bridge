@@ -1,0 +1,11 @@
+.env
+.env.*
+.claude/
+__pycache__/
+*.pyc
+.venv*/
+*.egg-info/
+.ipynb_checkpoints/
+xlrb_work/
+*.npy
+*.pt
