@@ -1,0 +1,51 @@
+{
+  "L_d": 20,
+  "L_r": [
+    25,
+    27,
+    29
+  ],
+  "tau": 0.3977279073386513,
+  "c": 1.25,
+  "mode": "clamp",
+  "gate": "probe",
+  "positions": "gen",
+  "m_star": {
+    "25": 32.62767589211112,
+    "27": 33.69153044286969,
+    "29": 38.671684962573224
+  },
+  "model_id": "CohereLabs/tiny-aya-global",
+  "meta": {
+    "selected_on": "val",
+    "tune_langs": [
+      "en",
+      "bn",
+      "sw",
+      "jv"
+    ],
+    "base_val_asr": 0.085,
+    "base_val_orr_benign": 0.05,
+    "val_row": {
+      "L_r": [
+        25,
+        27,
+        29
+      ],
+      "c": 1.25,
+      "asr": 0.0,
+      "orr_benign": 0.08499999999999999,
+      "asr_per_lang": {
+        "en": 0.0,
+        "bn": 0.0,
+        "sw": 0.0,
+        "jv": 0.0
+      }
+    },
+    "probe": {
+      "beta": 1.0,
+      "lam": 0.1
+    },
+    "gate_fpr_target": 0.05
+  }
+}

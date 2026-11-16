@@ -1,0 +1,49 @@
+{
+  "belebele_acc_base": {
+    "en": 0.84,
+    "zh": 0.82,
+    "it": 0.75,
+    "vi": 0.77,
+    "ar": 0.73,
+    "ko": 0.78,
+    "th": 0.69,
+    "bn": 0.75,
+    "sw": 0.71,
+    "jv": 0.72
+  },
+  "belebele_acc_base_macro": 0.756,
+  "belebele_acc_bridge": {
+    "en": 0.84,
+    "zh": 0.82,
+    "it": 0.75,
+    "vi": 0.77,
+    "ar": 0.73,
+    "ko": 0.78,
+    "th": 0.69,
+    "bn": 0.75,
+    "sw": 0.71,
+    "jv": 0.72
+  },
+  "belebele_acc_bridge_macro": 0.756,
+  "auditkit": {
+    "base": {
+      "exact_match": 0.756
+    },
+    "bridge": {
+      "exact_match": 0.756
+    },
+    "compare": "Comparison: df5a593475338475 (baseline) -> 51453dea28f41bba (candidate)\n  per-metric (baseline -> candidate | absolute delta | relative %):\n    exact_match: 0.7560 -> 0.7560  delta=+0.0000 (+0.0% rel)  (n=1000->1000, std=0.4295->0.4295)\n  samples: 0 went correct->wrong, 0 went wrong->correct\n  performance: latency 3ms -> 1ms, throughput 321148.22 -> 800152.35 req/s (speedup=2.49x)\n  model: callable:capability.<locals>.<lambda>:8ab57f01 -> callable:capability.<locals>.<lambda>:fa11258b (no measurable size)"
+  },
+  "kl_first_token_benign": {
+    "mean": 0.041517225633064904,
+    "p95": 0.0,
+    "frac_nonzero": 0.027333333333333334
+  },
+  "kl_first_token_xstest_safe": {
+    "mean": 0.13736857205499398,
+    "p95": 1.2242457091808316,
+    "frac_nonzero": 0.14069767441860465
+  },
+  "tokens_per_s_base": 284.0,
+  "tokens_per_s_bridge": 283.4
+}

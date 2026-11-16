@@ -1,0 +1,24 @@
+{
+  "mt_model": "facebook/nllb-200-distilled-1.3B",
+  "bt_model": "facebook/nllb-200-distilled-1.3B",
+  "dropped": {
+    "benign": 77,
+    "xstest_safe": 44
+  },
+  "chrf_mean": {
+    "benign": 73.1,
+    "xstest_safe": 70.5
+  },
+  "counts": {
+    "harmful/train": 115,
+    "harmful/val": 50,
+    "harmful/test": 150,
+    "benign/train": 115,
+    "benign/val": 50,
+    "benign/test": 150,
+    "xstest_safe/train": 0,
+    "xstest_safe/val": 50,
+    "xstest_safe/test": 156
+  },
+  "rows": 8360
+}
