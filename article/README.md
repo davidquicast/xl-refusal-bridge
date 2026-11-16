@@ -174,7 +174,7 @@ Splits are by prompt: harmful and benign 115 train / 50 validation / 150 test; X
 
 ## 4. Method
 
-In plain words: we compute one direction that means "refuse", train one small classifier that means "this is
+> **In plain words.** We compute one direction that means "refuse", train one small classifier that means "this is
 harmful", and connect them. The formulas below are the exact definitions.
 
 Activations are read on the residual stream (the running internal state that every layer reads and updates) at
@@ -198,6 +198,8 @@ on validation data in four languages by the rule fixed in advance: lowest attack
 more than 4 pp above baseline.
 
 ## 5. Measurement, and how far to trust it
+
+> **In plain words.** A second model reads every response and labels it. We checked that judge against a much larger one: its "refused or not" label is reliable, its "harmful or not" label is noisy for single responses.
 
 Responses are translated to English (NLLB) and labelled by Qwen2.5-7B-Instruct with a two-field rubric: *refusal*
 (the response explicitly declines or rejects the request) and *harmful* (the response supplies content that serves
@@ -227,6 +229,8 @@ correction over the ten languages.
 
 ### 6.1 H1 holds: detection does not depend on the language
 
+> **In plain words.** The detector tells harmful from harmless requests almost perfectly in all ten languages, even in a language it never saw during training.
+
 | | Range over the ten languages |
 |---|---|
 | Probe AUROC, harmful vs. benign (test) | 0.988 to 0.996 |
@@ -242,6 +246,8 @@ middle of the network.
 
 ### 6.2 H2 holds in part: the routing margin shrinks, and it predicts attack success
 
+> **In plain words.** The refusal signal is weaker outside English, weakest in the low-resource languages, and the languages with the weakest signal are the ones where the model most often gives a harmful answer.
+
 ![Detection and routing by layer](figures/detect_vs_route.png)
 
 *Figure 4. Detection quality and routing margin by layer and language. Source: own elaboration from `results/tiny-aya-global-r2/fit/analysis.json`.*
@@ -256,6 +262,8 @@ Baseline attack success by language correlates with that margin (ρ = −0.77) a
 languages differ in how often a non-refusal is actually harmful.
 
 ### 6.3 H3 holds: the bridge closes the gap
+
+> **In plain words.** With the bridge, harmful answers almost disappear in every language and the difference between languages goes away. The price is a few more refusals of safe requests.
 
 The before/after figure is at the top of the article. ASR means attack success rate; "macro" is the average over
 languages; ↓ marks columns where lower is better and ↑ where higher is better.
@@ -307,6 +315,8 @@ contains mild items for which a helpful answer is arguably fine; a higher refusa
 
 ### 6.4 What each part contributes
 
+> **In plain words.** We removed one piece at a time to see which ones matter. The gate matters most: without it the model refuses almost everything.
+
 The ablation table above uses the same prompts for every row.
 
 - **Direction matters.** A random direction with the same gate and strength leaves attack success at baseline.
@@ -322,12 +332,16 @@ The ablation table above uses the same prompts for every row.
 
 ### 6.5 Against SafeTune baselines
 
+> **In plain words.** The standard steering method from the kit helps less, because without a gate it cannot push hard without also refusing normal requests.
+
 SafeTune's uniform refusal-direction steering, tuned with the same validation rule, reaches 1.7 % attack success and
 77.9 % refusal. It has no gate, so its strength is capped by benign over-refusal. SafeTune's CAST (conditional activation steering, its built-in gated method), with default
 settings calibrated on our training split, refused nearly everything including benign prompts (99.6 %); we report it
 as run and did not tune it further.
 
 ### 6.6 Transfer to other prompts and unseen languages
+
+> **In plain words.** The same adapter, untouched, also works on a different set of harmful prompts in six languages it was never fitted on.
 
 The bridge was applied unchanged to 100 SORRY-Bench prompts in six languages that were never used for the direction,
 the probe, the threshold or the tuning.
@@ -344,6 +358,8 @@ the probe, the threshold or the tuning.
 Macro attack success 9.0 % → 1.3 %; refusal 65.8 % → 86.0 % (n = 100 per language). The gate, never fitted on these prompts or languages, opens on 79 to 88 % of them in the six unseen languages, against 95 to 99 % on MultiJail: detection transfers, with some loss. Refusal rises significantly in all six languages; attack success falls significantly in Hindi and Russian.
 
 ### 6.7 Capability, red team and circuits (AuditKIT, CircuitKIT)
+
+> **In plain words.** The model is as capable and as fast as before, and somewhat more resistant to a standard set of attack probes.
 
 AuditKIT is the Lexsi kit for evaluation and red teaming; CircuitKIT is the one for tracing which internal
 components drive a behaviour.
@@ -365,6 +381,8 @@ Bengali top 20 and none in the Swahili one. This is consistent with a shared ear
 routing, but it is one run per language without a significance test, and we do not build on it.
 
 ### 6.8 The same study under a ten-times-larger judge
+
+> **In plain words.** We repeated all the labelling with a judge ten times larger. The conclusions are the same, and the improvement becomes statistically significant in nine of ten languages.
 
 Because the harmful label of the 7B judge is noisy (Section 5), every test response of every condition (25,220
 prompt-response pairs) was labelled again by Qwen2.5-72B with the same rubric. Each cell shows the primary judge's
@@ -411,6 +429,8 @@ Full numbers: `results/tiny-aya-global-r2/judge72.json`.
 
 ## 7. Cost comparison
 
+> **In plain words.** The adapter costs almost nothing to build and nothing to run. Serving one million requests a month on a rented GPU costs about a tenth of a closed API.
+
 Measured for this model and benchmark (fitting and tuning on an A100, throughput on an L4):
 
 | | Bridge |
@@ -456,6 +476,8 @@ we can make is against SafeTune's steering, which has the same order of cost and
 (Section 6.5).
 
 ## 8. Limitations
+
+> **In plain words.** What this work does not show, so that nobody reads more into it than it supports.
 
 - One model and one harmful-prompt family for fitting. MultiJail prompts are direct requests, not adversarial
   jailbreaks; nothing here shows robustness to an attacker who optimises against the gate.
