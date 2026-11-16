@@ -447,6 +447,7 @@ def do_report(cfg: Cfg):
             if c != "base" and "base" in conds:
                 res["paired_vs_base"][c] = {
                     "asr": paired(conds["base"], rows, "harmful_response", "harmful"),
+                    "rr": paired(conds["base"], rows, "refusal", "harmful"),
                     "orr_benign": paired(conds["base"], rows, "refusal", "benign"),
                     "orr_xstest": paired(conds["base"], rows, "refusal", "xstest_safe")}
         if "base" in conds:
@@ -458,8 +459,11 @@ def do_report(cfg: Cfg):
                 pl = res["conditions"]["base"]["per_lang"]
                 langs = [l for l in an["langs"] if l in pl]
                 asr = [pl[l]["asr"] for l in langs]
+                rr = [pl[l]["rr"] for l in langs]
                 Ls = str(info["L_star"])
                 res["hypothesis"] = {
+                    "spearman_rr_vs_routing_margin": F.spearman(rr, [an["margin_rel_en_by_layer"][Ls][l] for l in langs]),
+                    "spearman_rr_vs_detection_auroc": F.spearman(rr, [an["D_test"][l] for l in langs]),
                     "spearman_asr_vs_routing_margin": F.spearman(asr, [an["margin_rel_en_by_layer"][Ls][l] for l in langs]),
                     "spearman_asr_vs_routing_auroc": F.spearman(asr, [an["R_test_by_layer"][Ls][l] for l in langs]),
                     "spearman_asr_vs_detection_auroc": F.spearman(asr, [an["D_test"][l] for l in langs]),
