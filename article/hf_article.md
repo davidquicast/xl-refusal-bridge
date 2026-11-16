@@ -46,7 +46,7 @@ is harmful, and a "bridge" that, only when the detector fires, lifts the refusal
 
 ## Try the demo
 
-<iframe src="https://davidquicast-xl-refusal-bridge.hf.space" frameborder="0" width="100%" height="720"></iframe>
+**[Open the interactive demo](https://huggingface.co/spaces/davidquicast/xl-refusal-bridge)**: pick a language and a prompt type and compare, side by side, what Tiny Aya answers with and without the bridge, with the judge's verdict and whether the detector fired.
 
 <details>
 <summary><b>Glossary: terms used in this article (click to expand)</b></summary>
