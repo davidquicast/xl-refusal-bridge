@@ -1,4 +1,4 @@
-# XL-Refusal-Bridge: making Tiny Aya as safe in Swahili and Javanese as it is in English, with a 33 KB adapter
+# XL-Refusal-Bridge: closing Tiny Aya's cross-lingual safety gap with a 33 KB adapter and no retraining
 
 *Tiny Aya recognises a harmful request equally well in every language. In low-resource languages it just acts on
 that recognition less firmly. We measure this and fix it without retraining the model.*
@@ -44,7 +44,12 @@ is harmful, and a "bridge" that, only when the detector fires, lifts the refusal
 [run logs](https://huggingface.co/datasets/davidquicast/xl-refusal-bridge-logs) ·
 [code](https://github.com/davidquicast/xl-refusal-bridge)
 
-## Terms used in this article
+## Try the demo
+
+<iframe src="https://davidquicast-xl-refusal-bridge.hf.space" frameborder="0" width="100%" height="720"></iframe>
+
+<details>
+<summary><b>Glossary: terms used in this article (click to expand)</b></summary>
 
 | Term | Meaning here |
 |---|---|
@@ -66,7 +71,9 @@ is harmful, and a "bridge" that, only when the detector fires, lifts the refusal
 | McNemar test, Holm correction | The statistical test for before/after on the same prompts, corrected for testing ten languages at once |
 | Spearman ρ | Rank correlation between two lists, from −1 to 1 |
 
-## Summary for specialists
+</details>
+
+## Key findings
 
 - **Detection is language-invariant.** One linear probe at layer 20 separates harmful from benign prompts with
   AUROC 0.988 to 0.996 in all ten languages. Trained with any one language held out, it scores 0.988 to 0.994 on
@@ -447,3 +454,20 @@ we can make is against SafeTune's steering, which has the same order of cost and
 Code, configuration, results and the adapter are in the repository. `python tests/dry_run.py` runs the whole path
 offline on a tiny random model. The full study runs as two GPU sessions (`notebooks/`); every stage writes a
 `run.json` with code revision, config hash, seed, hardware and library versions.
+
+## References
+
+1. Cohere Labs. *Tiny Aya* model family (`CohereLabs/tiny-aya-global`), Hugging Face, 2026.
+2. Deng, Y., Zhang, W., Pan, S. J., Bing, L. *Multilingual Jailbreak Challenges in Large Language Models* (MultiJail). ICLR 2024.
+3. Röttger, P., Kirk, H. R., Vidgen, B., Attanasio, G., Bianchi, F., Hovy, D. *XSTest: A Test Suite for Identifying Exaggerated Safety Behaviours in Large Language Models*. NAACL 2024.
+4. Taori, R. et al. *Stanford Alpaca: An Instruction-following LLaMA Model*. 2023.
+5. Xie, T. et al. *SORRY-Bench: Systematically Evaluating Large Language Model Safety Refusal*. 2024.
+6. Bandarkar, L. et al. *The Belebele Benchmark: a Parallel Reading Comprehension Dataset in 122 Language Variants*. 2023.
+7. NLLB Team. *No Language Left Behind: Scaling Human-Centered Machine Translation*. 2022.
+8. Arditi, A. et al. *Refusal in Language Models Is Mediated by a Single Direction*. NeurIPS 2024.
+9. Lee, B. W. et al. *Programming Refusal with Conditional Activation Steering* (CAST). 2024.
+10. Hanna, M., Pezzelle, S., Belinkov, Y. *Have Faith in Faithfulness: Going Beyond Circuit Overlap When Finding Model Mechanisms* (EAP-IG). 2024.
+11. Kumar, P. et al. *PolyGuard: A Multilingual Safety Moderation Tool for 17 Languages*. 2025.
+12. Qwen Team. *Qwen2.5* model family (7B-Instruct and 72B-Instruct), 2024.
+13. Lexsi Labs. CuratorKIT, SafeTune, CircuitKIT and AuditKIT (hackathon toolkits), 2026.
+14. Pricing pages accessed 16 November 2026: https://artificialanalysis.ai/models/command-a, https://cohere.com/pricing, https://lambda.com/pricing.
