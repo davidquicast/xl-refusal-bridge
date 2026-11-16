@@ -21,6 +21,8 @@ is harmful, and a "bridge" that, only when the detector fires, lifts the refusal
 
 ![How the bridge works](https://raw.githubusercontent.com/davidquicast/xl-refusal-bridge/main/article/figures/how_it_works.png)
 
+*Figure 1. How the bridge works. The detector reads layer 20; the bridge acts on layers 25, 27 and 29. These are the values stored in the published adapter configuration (`adapters/tiny-aya-global-r2/config.json`). Source: own elaboration.*
+
 **What it does.** Measured on 1,500 harmful prompts across ten languages:
 
 | | Tiny Aya | Tiny Aya + bridge |
@@ -35,6 +37,8 @@ is harmful, and a "bridge" that, only when the detector fires, lifts the refusal
 
 ![Before and after, per language](https://raw.githubusercontent.com/davidquicast/xl-refusal-bridge/main/article/figures/before_after.png)
 
+*Figure 2. Attack success rate and over-refusal per language for the base model, the SafeTune refusal-direction baseline and the gated bridge (test split, bars show 95 % confidence intervals). Source: own elaboration from `results/tiny-aya-global-r2/metrics.json`.*
+
 **The cost, stated up front.** The model becomes somewhat more cautious with safe requests that sound alarming
 ("How do I kill a Python process?"): about 7 points more refusals on those.
 
@@ -46,7 +50,24 @@ is harmful, and a "bridge" that, only when the detector fires, lifts the refusal
 
 ## Try the demo
 
-**[Open the interactive demo](https://huggingface.co/spaces/davidquicast/xl-refusal-bridge)**: pick a language and a prompt type and compare, side by side, what Tiny Aya answers with and without the bridge, with the judge's verdict and whether the detector fired.
+Pick a language and a prompt type and compare, side by side, what Tiny Aya answers with and without the bridge.
+[Open it in a new tab](https://huggingface.co/spaces/davidquicast/xl-refusal-bridge) if it does not load below.
+
+<iframe
+   src="https://davidquicast-xl-refusal-bridge.hf.space"
+   frameborder="0"
+   width="100%"
+   height="760px"
+></iframe>
+
+The benchmark, browsable:
+
+<iframe
+   src="https://huggingface.co/datasets/davidquicast/xl-refusal-bench/embed/viewer/default/train"
+   frameborder="0"
+   width="100%"
+   height="560px"
+></iframe>
 
 <details>
 <summary><b>Glossary: terms used in this article (click to expand)</b></summary>
@@ -92,6 +113,23 @@ is harmful, and a "bridge" that, only when the detector fires, lifts the refusal
   7.5 % → 0.1 %, significant in nine of ten languages, and ρ = −0.82 for the margin correlation.
 - **It transfers.** On a different prompt source (SORRY-Bench) and six languages never used to fit anything, ASR
   falls from 9.0 % to 1.3 %.
+
+## How the pieces fit together
+
+The submission chains four Lexsi kits around the method we contribute. Each kit does one job in the pipeline, in
+this order:
+
+![Pipeline](https://raw.githubusercontent.com/davidquicast/xl-refusal-bridge/main/article/figures/pipeline.png)
+
+*Figure 3. The pipeline. Blue boxes are Lexsi kits, the orange box is our contribution. Source: own elaboration.*
+
+| Step | Tool | What it did here | Where to find the output |
+|---|---|---|---|
+| 1 | CuratorKIT | Cleaned and de-duplicated the prompts, wrote the dataset card | [xl-refusal-bench](https://huggingface.co/datasets/davidquicast/xl-refusal-bench) |
+| 2 | SafeTune | Extracted the refusal direction (matches ours, cosine 0.99999) and ran two steering baselines | Section 6.5 |
+| 3 | Our method | Fitted the probe, the gate and the clamp | [adapter](https://huggingface.co/davidquicast/tiny-aya-xl-refusal-bridge) |
+| 4 | AuditKIT | Capability check, red-team probes, paired before/after comparison | Section 6.7 |
+| 5 | CircuitKIT | Attribution of the refusal decision in three languages | Section 6.7 |
 
 ## 1. Question
 
@@ -226,6 +264,8 @@ middle of the network.
 ### 6.2 H2 holds in part: the routing margin shrinks, and it predicts attack success
 
 ![Detection and routing by layer](https://raw.githubusercontent.com/davidquicast/xl-refusal-bridge/main/article/figures/detect_vs_route.png)
+
+*Figure 4. Detection quality and routing margin by layer and language. Source: own elaboration from `results/tiny-aya-global-r2/fit/analysis.json`.*
 
 Projection onto the English refusal direction still *separates* harmful from benign prompts in every language (AUROC
 above 0.97 at the steering layer). What changes is the distance: harmful prompts in Javanese sit at 46 % of the
@@ -457,17 +497,19 @@ offline on a tiny random model. The full study runs as two GPU sessions (`notebo
 
 ## References
 
-1. Cohere Labs. *Tiny Aya* model family (`CohereLabs/tiny-aya-global`), Hugging Face, 2026.
-2. Deng, Y., Zhang, W., Pan, S. J., Bing, L. *Multilingual Jailbreak Challenges in Large Language Models* (MultiJail). ICLR 2024.
-3. Röttger, P., Kirk, H. R., Vidgen, B., Attanasio, G., Bianchi, F., Hovy, D. *XSTest: A Test Suite for Identifying Exaggerated Safety Behaviours in Large Language Models*. NAACL 2024.
-4. Taori, R. et al. *Stanford Alpaca: An Instruction-following LLaMA Model*. 2023.
-5. Xie, T. et al. *SORRY-Bench: Systematically Evaluating Large Language Model Safety Refusal*. 2024.
-6. Bandarkar, L. et al. *The Belebele Benchmark: a Parallel Reading Comprehension Dataset in 122 Language Variants*. 2023.
-7. NLLB Team. *No Language Left Behind: Scaling Human-Centered Machine Translation*. 2022.
-8. Arditi, A. et al. *Refusal in Language Models Is Mediated by a Single Direction*. NeurIPS 2024.
-9. Lee, B. W. et al. *Programming Refusal with Conditional Activation Steering* (CAST). 2024.
-10. Hanna, M., Pezzelle, S., Belinkov, Y. *Have Faith in Faithfulness: Going Beyond Circuit Overlap When Finding Model Mechanisms* (EAP-IG). 2024.
-11. Kumar, P. et al. *PolyGuard: A Multilingual Safety Moderation Tool for 17 Languages*. 2025.
-12. Qwen Team. *Qwen2.5* model family (7B-Instruct and 72B-Instruct), 2024.
-13. Lexsi Labs. CuratorKIT, SafeTune, CircuitKIT and AuditKIT (hackathon toolkits), 2026.
-14. Pricing pages accessed 16 November 2026: https://artificialanalysis.ai/models/command-a, https://cohere.com/pricing, https://lambda.com/pricing.
+1. Cohere Labs (2026). *Tiny Aya Global* [model]. Hugging Face. https://huggingface.co/CohereLabs/tiny-aya-global
+2. Deng, Y., Zhang, W., Pan, S. J., & Bing, L. (2023). *Multilingual jailbreak challenges in large language models*. arXiv. https://arxiv.org/abs/2310.06474
+3. Röttger, P., Kirk, H. R., Vidgen, B., Attanasio, G., Bianchi, F., & Hovy, D. (2023). *XSTest: A test suite for identifying exaggerated safety behaviours in large language models*. arXiv. https://arxiv.org/abs/2308.01263
+4. Taori, R., et al. (2023). *Stanford Alpaca: An instruction-following LLaMA model*. GitHub. https://github.com/tatsu-lab/stanford_alpaca
+5. Xie, T., et al. (2024). *SORRY-Bench: Systematically evaluating large language model safety refusal*. arXiv. https://arxiv.org/abs/2406.14598
+6. Bandarkar, L., et al. (2023). *The Belebele benchmark: A parallel reading comprehension dataset in 122 language variants*. arXiv. https://arxiv.org/abs/2308.16884
+7. NLLB Team (2022). *No language left behind: Scaling human-centered machine translation*. arXiv. https://arxiv.org/abs/2207.04672
+8. Arditi, A., et al. (2024). *Refusal in language models is mediated by a single direction*. arXiv. https://arxiv.org/abs/2406.11717
+9. Lee, B. W., et al. (2024). *Programming refusal with conditional activation steering*. arXiv. https://arxiv.org/abs/2409.05907
+10. Hanna, M., Pezzelle, S., & Belinkov, Y. (2024). *Have faith in faithfulness: Going beyond circuit overlap when finding model mechanisms*. arXiv. https://arxiv.org/abs/2403.17806
+11. Kumar, P., et al. (2025). *PolyGuard: A multilingual safety moderation tool for 17 languages*. arXiv. https://arxiv.org/abs/2504.04377
+12. Qwen Team (2024). *Qwen2.5-7B-Instruct* and *Qwen2.5-72B-Instruct* [models]. Hugging Face. https://huggingface.co/Qwen/Qwen2.5-7B-Instruct, https://huggingface.co/Qwen/Qwen2.5-72B-Instruct
+13. Lexsi Labs (2026). *CuratorKIT, SafeTune, CircuitKIT, AuditKIT* [software toolkits provided for the hackathon].
+14. Artificial Analysis (2026). *Command A: pricing*. Retrieved 16 November 2026, from https://artificialanalysis.ai/models/command-a
+15. Cohere (2026). *Pricing*. Retrieved 16 November 2026, from https://cohere.com/pricing
+16. Lambda (2026). *GPU cloud pricing*. Retrieved 16 November 2026, from https://lambda.com/pricing
