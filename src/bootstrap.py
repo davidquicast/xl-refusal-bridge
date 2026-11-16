@@ -59,6 +59,12 @@ env = {"XLRB_HF_USER": USER, "PYTHONPATH": "/content/xlrb_code/code/src",
        "XLRB_CODE_SHA": open("/content/xlrb_code/code/CODE_SHA").read().strip(), "PYTHONUNBUFFERED": "1"}
 sh("nvidia-smi --query-gpu=name,memory.total --format=csv")
 flags = open("/content/xlrb_code/code/FLAGS").read().split() if os.path.exists("/content/xlrb_code/code/FLAGS") else []
+for f in flags:                           # e.g. model_a=CohereLabs/tiny-aya-earth, env_a=XLRB_SKIP_ABLATIONS:1
+    if f.startswith(f"model_{SESSION}="):
+        env["XLRB_MODEL"] = f.split("=", 1)[1]
+    if f.startswith(f"env_{SESSION}="):
+        k, v = f.split("=", 1)[1].split(":", 1)
+        env[k] = v
 if f"judgecheck_{SESSION}" in flags:      # validate the judge against reference labels before anything else
     sh("python -u -m xlrb.judgecheck", {**env, "XLRB_WORK": "/content/xlrb_work"})
     upload_log()

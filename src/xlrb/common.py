@@ -48,7 +48,7 @@ class Cfg:
     seed: int = 0
     rev: str = "r2"              # protocol revision: r2 = hard negatives in the probe + stricter refusal rubric
     # earlier revision whose generations may be re-judged instead of regenerated
-    reuse_tag: str = os.environ.get("XLRB_REUSE_TAG", "tiny-aya-global")
+    reuse_tag: str = os.environ.get("XLRB_REUSE_TAG", "")   # default: the same model, without revision
     n_train: int = 115
     n_val: int = 50
     n_test: int = 150

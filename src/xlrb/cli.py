@@ -223,10 +223,13 @@ def evaluate(cfg: Cfg, S: Session, rows: list[dict], ctx=None, native: bool = Fa
 def _reuse(cfg: Cfg, cond: str, split: str, rows: list[dict]) -> int:
     """Copy generations (not verdicts) of an earlier protocol revision for conditions that do not
     depend on the probe: the unmodified model and the SafeTune baselines."""
-    if not cfg.reuse_tag or not (cond == "base" or cond.startswith(("st_", "tune_st_"))):
+    if not (cond == "base" or cond.startswith(("st_", "tune_st_"))):
+        return 0
+    src = cfg.reuse_tag or cfg.model_id.split("/")[-1]      # never another model's generations
+    if src == cfg.tag:
         return 0
     try:
-        old = {r["id"]: r for r in read_jsonl(pull(cfg, f"eval/{cfg.reuse_tag}/{cond}_{split}.jsonl"))}
+        old = {r["id"]: r for r in read_jsonl(pull(cfg, f"eval/{src}/{cond}_{split}.jsonl"))}
     except Exception:  # noqa: BLE001 - nothing to reuse
         return 0
     n = 0
@@ -512,7 +515,10 @@ def run_a(cfg: Cfg, quick: bool = False):
     do_eval(cfg, S, "bridge", Bridge(model, spec, w, r), "test", n=n, extra={"spec": asdict(spec)},
             sig=spec_sig(spec))
     do_report(cfg)
-    for name, (sp, ww, rr) in variants(cfg, spec, w, r).items():
+    import os
+
+    abl = {} if os.environ.get("XLRB_SKIP_ABLATIONS") else variants(cfg, spec, w, r)   # replications skip them
+    for name, (sp, ww, rr) in abl.items():
         try:
             do_eval(cfg, S, name, Bridge(model, sp, ww, rr), "test", ABL_LANGS, n=n or 100,
                     sig=spec_sig(sp, name))
