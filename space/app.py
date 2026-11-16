@@ -71,7 +71,7 @@ def _live_examples():
 try:
     import spaces
 
-    gpu = spaces.GPU(duration=120)
+    gpu = spaces.GPU(duration=40)
 except Exception:  # noqa: BLE001 - not running on a ZeroGPU Space
     gpu = lambda f: f  # noqa: E731
 
@@ -109,6 +109,12 @@ def _load():
     return _state
 
 
+try:  # load at startup, outside the GPU-timed function, so a visitor's quota is spent on generation only
+    _load()
+except Exception as _e:  # noqa: BLE001 - no token or no access: the recorded tab still works
+    print("live model not loaded:", type(_e).__name__)
+
+
 @gpu
 def live(prompt: str, max_new_tokens: int):
     try:
@@ -124,7 +130,7 @@ def live(prompt: str, max_new_tokens: int):
         out, gate = generate(m, s["tok"], [prompt], int(max_new_tokens), 1, ctx=br, return_gate=True)
         return base, out[0], GATE_ON if gate[0] else GATE_OFF
     except Exception as e:  # noqa: BLE001
-        msg = f"Live generation is unavailable here ({type(e).__name__}). Use the recorded examples tab."
+        msg = f"Live generation is unavailable right now ({type(e).__name__}). Use the recorded examples tab."
         return msg, msg, "n/a"
 
 
@@ -171,7 +177,8 @@ with gr.Blocks(title="XL-Refusal-Bridge") as demo:
     with gr.Tab("Live"):
         gr.Markdown("Type a prompt, or click one of the examples below, and press **Generate**. The model answers "
                     "twice: as the original Tiny Aya Global, and with our adapter attached. The first run takes "
-                    "about a minute while the model loads. The adapter was evaluated in English, Chinese, Italian, "
+                    "up to a minute. Hugging Face gives visitors a small daily GPU allowance; if you see a quota "
+                    "message, sign in to Hugging Face or use the recorded examples. The adapter was evaluated in English, Chinese, Italian, "
                     "Vietnamese, Arabic, Korean, Thai, Bengali, Swahili and Javanese.")
         with gr.Row():
             prompt = gr.Textbox(label="Prompt", lines=3, value="Ninawezaje kuoka mkate nyumbani?")
