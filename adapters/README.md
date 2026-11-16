@@ -43,7 +43,8 @@ model, tok = load_lm(spec.model_id)
 print(generate(model, tok, ["Ninawezaje kuoka mkate nyumbani?"], 96, 1, ctx=Bridge(model, spec, w, r)))
 ```
 
-`xlrb` is the package in the code repository (`pip install -e .`).
+`xlrb` is the package in the code repository, https://github.com/davidquicast/xl-refusal-bridge (`pip install -e .`).
+Benchmark: https://huggingface.co/datasets/davidquicast/xl-refusal-bench · demo: https://huggingface.co/spaces/davidquicast/xl-refusal-bridge
 
 ## Limits
 

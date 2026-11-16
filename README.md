@@ -5,6 +5,13 @@
 Lexsi AI Safety and Alignment Hackathon — Track 2 (multilingual safety, locating and steering safety behaviour).
 Model under test: [`CohereLabs/tiny-aya-global`](https://huggingface.co/CohereLabs/tiny-aya-global) (3.35 B parameters, 36 layers).
 
+| Artifact | Link |
+|---|---|
+| Write-up | [`article/README.md`](article/README.md) |
+| Benchmark | https://huggingface.co/datasets/davidquicast/xl-refusal-bench |
+| Adapter | https://huggingface.co/davidquicast/tiny-aya-xl-refusal-bridge |
+| Demo | https://huggingface.co/spaces/davidquicast/xl-refusal-bridge |
+
 ## The question
 
 A multilingual model has to do two things before it refuses a harmful request: **recognise** that the request is
