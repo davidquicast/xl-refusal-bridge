@@ -88,6 +88,10 @@ Full write-up: [`article/README.md`](article/README.md). Headline numbers, test 
 - Routing margin relative to English: 0.55–0.73 for six high/mid-resource languages, 0.46–0.54 for Bengali, Swahili,
   Javanese. Baseline attack success correlates with it (Spearman −0.77, n = 10) and not with detection (−0.07).
 - Unseen prompts and languages (SORRY-Bench; de, es, fr, hi, ja, ru): attack success 9.0 % → 1.3 %.
+- Re-labelling all 25,220 test responses with a ten-times-larger judge (Qwen2.5-72B) gives the same picture:
+  attack success 7.5 % → 0.1 %, significant in nine of ten languages; margin correlation −0.82.
+- Cost: about $249 a month self-hosted against $2,530 on a closed API for one million requests (assumptions in
+  the article, Section 6).
 - Belebele accuracy unchanged (75.6 %, 0 of 1,000 items differ); throughput 284 → 283 tokens/s; adapter 33 KB.
 - The harmful label of the judge is noisy at these base rates (κ 0.2–0.4 against a larger judge and against
   native-language judging); the refusal label is reliable (κ 0.75). Read attack-success figures accordingly.

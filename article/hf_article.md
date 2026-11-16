@@ -24,6 +24,8 @@ Code: https://github.com/davidquicast/xl-refusal-bridge · benchmark: https://hu
 - **It costs over-refusal on alarming-but-safe prompts.** Refusal of benign instructions moves from 6.0 % to 8.2 %
   (not significant in any language); refusal of XSTest-safe prompts moves from 17.6 % to 24.4 % (significant in
   Bengali and Javanese).
+- **A ten-times-larger judge agrees.** Re-labelling all 25,220 test responses with Qwen2.5-72B gives 7.5 % → 0.1 %
+  attack success, significant in nine of ten languages, and ρ = −0.82 for the margin correlation.
 - **It transfers.** On a different prompt source (SORRY-Bench) and six languages never used to fit anything, attack
   success falls from 9.0 % to 1.3 %.
 
@@ -98,6 +100,9 @@ The refusal label is reliable. The harmful label is not: at a base rate near 5 %
 5 % are therefore close to the judge's noise floor.** Refusal rate is the better-measured outcome, and we report both
 throughout. An earlier rubric that counted any non-answer as a refusal inflated benign over-refusal threefold; it was
 caught by reading samples and replaced before any reported number was produced.
+
+To remove the dependence on one small judge, all test responses were later re-labelled by the 72B model
+(Section 5.8).
 
 Rates carry bootstrap 95 % intervals. Before/after comparisons use an exact McNemar test per language with Holm
 correction over the ten languages.
@@ -237,9 +242,54 @@ Three attention heads of layer 20, the layer the detector reads, are in the Engl
 Bengali top 20 and none in the Swahili one. This is consistent with a shared early part and language-dependent later
 routing, but it is one run per language without a significance test, and we do not build on it.
 
+### 5.8 The same study under a ten-times-larger judge
+
+Because the harmful label of the 7B judge is noisy (Section 4), every test response of every condition (25,220
+prompt–response pairs) was labelled again by Qwen2.5-72B with the same rubric. Each cell shows the primary judge's
+value, then the larger judge's.
+
+| Condition | ASR % (7B → 72B judge) | Refusal on harmful % | Over-refusal benign % | Over-refusal XSTest % | Gap max pp |
+|---|---|---|---|---|---|
+| Tiny Aya (base) | 5.4 → 7.5 | 69.9 → 77.3 | 6.0 → 4.1 | 17.6 → 26.7 | 9.3 → 8.7 |
+| + gated bridge (ours) | 0.1 → 0.1 | 95.6 → 96.6 | 8.2 → 5.8 | 24.4 → 32.2 | 0.7 → 0.7 |
+| SafeTune refusal direction | 1.7 → 1.6 | 77.9 → 86.0 | 6.0 → 5.1 | 22.4 → 35.3 | 4.0 → 4.7 |
+| SafeTune CAST | 0.9 → 0.3 | 98.2 → 97.3 | 99.6 → 99.6 | 98.1 → 98.4 | 8.0 → 2.0 |
+
+Per language, larger judge only:
+
+| Lang | ASR % base → bridge | Holm p | Refusal % base → bridge |
+|---|---|---|---|
+| en | 4.7 → 0.0 | 0.047 | 79.3 → 98.0 |
+| zh | 5.3 → 0.0 | 0.039 | 79.3 → 99.3 |
+| it | 6.0 → 0.7 | 0.039 | 78.7 → 96.0 |
+| vi | 2.7 → 0.0 | 0.12 | 84.0 → 96.7 |
+| ar | 8.7 → 0.7 | 0.0029 | 72.7 → 97.3 |
+| ko | 8.7 → 0.0 | 0.0017 | 79.3 → 94.7 |
+| th | 4.7 → 0.0 | 0.047 | 81.3 → 92.0 |
+| bn | 10.7 → 0.0 | 0.00027 | 68.7 → 95.3 |
+| sw | 10.0 → 0.0 | 0.00049 | 74.0 → 98.7 |
+| jv | 13.3 → 0.0 | 1.9e-05 | 76.0 → 98.0 |
+
+- The conclusion does not depend on the judge. Under the larger judge baseline attack success is higher
+  (7.5 % vs. 5.4 %), the bridge still brings it to 0.1 %, and the drop is significant in nine of ten languages
+  instead of three. Refusal rises significantly in every language (largest Holm-adjusted p = 0.005).
+- The correlation of baseline attack success with routing margin is ρ = -0.82 (detection: ρ = 0.15).
+- Unseen prompts and languages: 11.3 % → 1.8 % attack success, 66.5 % → 85.8 % refusal.
+- Over-refusal on XSTest-safe prompts is higher in absolute terms for both conditions under this judge and rises by
+  a similar amount (26.7 % → 32.2 %); it is significant only in Swahili.
+- Agreement between the two judges over all pairs: refusal 0.92 (κ 0.83), harmful 0.98 (κ 0.39). The harmful label
+  stays the weak one at the level of single responses; both judges give the same before/after picture.
+- One ablation reads differently: for the additive variant the larger judge counts far fewer refusals
+  (54.0 % vs. 91.6 %) while also finding no harmful responses. We have not inspected those responses and
+  draw no conclusion from that row. The other ablations agree across judges: no gate gives 76.2 % benign
+  over-refusal, a random direction leaves attack success at baseline (8.4 % vs. 8.8 % on the same prompts), and no
+  hard negatives gives 63.5 % over-refusal on XSTest.
+
+Full numbers: `results/tiny-aya-global-r2/judge72.json`.
+
 ## 6. Cost comparison
 
-Measured on one A100, for this model and benchmark:
+Measured for this model and benchmark (fitting and tuning on an A100, throughput on an L4):
 
 | | Bridge |
 |---|---|
@@ -250,6 +300,27 @@ Measured on one A100, for this model and benchmark:
 | Inference overhead | 284 → 283 tokens/s |
 | Capability change (Belebele) | 0 of 1,000 items |
 
+### Against a closed-source API
+
+A workload of one million requests a month, each with 500 input tokens (the chat template alone is about 370) and
+128 output tokens:
+
+| | Closed API (Cohere Command A) | Self-hosted Tiny Aya + bridge |
+|---|---|---|
+| Price basis | $2.50 / M input tokens, $10.00 / M output tokens | one A100 40 GB at $1.99 per GPU-hour |
+| Volume | 500 M input + 128 M output tokens | 128 M output tokens at 284 tokens/s = 125 GPU-hours |
+| Monthly cost, pay per use | **$2,530** | **$249** |
+| Monthly cost, one GPU always on | — | $1,453 (730 hours) |
+
+Sources and caveats. API price: aggregator listings of Cohere's Command A rate (artificialanalysis.ai,
+pricepertoken.com), checked November 2026. GPU price: Lambda on-demand A100 40 GB as listed by rental-price trackers
+the same month; other providers list $1.19–$1.79. Throughput is our measurement with batch size 32 on an **L4**, a
+slower card than the A100 priced here, so the self-hosted figure is conservative. The bridge adds no measurable
+latency (284 → 283 tokens/s). Not included: storage, networking, engineering time, and the fact that Command A is a
+far larger and more capable model; this compares cost for a workload a 3 B model can serve, not quality.
+
+### Against training
+
 We did not train a fine-tuned or LoRA safety baseline, so there is no measured cost for that route; the comparison
 we can make is against SafeTune's steering, which has the same order of cost and, without a gate, a worse trade-off
 (Section 5.5).
@@ -258,8 +329,8 @@ we can make is against SafeTune's steering, which has the same order of cost and
 
 - One model and one harmful-prompt family for fitting. MultiJail prompts are direct requests, not adversarial
   jailbreaks; nothing here shows robustness to an attacker who optimises against the gate.
-- Attack-success rates are near the judge's noise floor (Section 4). Claims that rest only on them are worded
-  accordingly; refusal-rate claims are on firmer ground.
+- Individual harmful labels are noisy for both judges (κ about 0.4 between them). The before/after picture is
+  the same under both; single-response verdicts should not be relied on. There is no human annotation.
 - Ten languages give ten points for the correlation in 5.2.
 - Benign and XSTest prompts are machine-translated, and responses are judged through machine translation. Quality is
   lowest in the languages the question is about.

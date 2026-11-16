@@ -22,6 +22,8 @@ Kits used: CuratorKIT → SafeTune → CircuitKIT → AuditKIT
 - **It costs over-refusal on alarming-but-safe prompts.** Refusal of benign instructions moves from 6.0 % to 8.2 %
   (not significant in any language); refusal of XSTest-safe prompts moves from 17.6 % to 24.4 % (significant in
   Bengali and Javanese).
+- **A ten-times-larger judge agrees.** Re-labelling all 25,220 test responses with Qwen2.5-72B gives 7.5 % → 0.1 %
+  attack success, significant in nine of ten languages, and ρ = −0.82 for the margin correlation.
 - **It transfers.** On a different prompt source (SORRY-Bench) and six languages never used to fit anything, attack
   success falls from 9.0 % to 1.3 %.
 
@@ -96,6 +98,9 @@ The refusal label is reliable. The harmful label is not: at a base rate near 5 %
 5 % are therefore close to the judge's noise floor.** Refusal rate is the better-measured outcome, and we report both
 throughout. An earlier rubric that counted any non-answer as a refusal inflated benign over-refusal threefold; it was
 caught by reading samples and replaced before any reported number was produced.
+
+To remove the dependence on one small judge, all test responses were later re-labelled by the 72B model
+(Section 5.8).
 
 Rates carry bootstrap 95 % intervals. Before/after comparisons use an exact McNemar test per language with Holm
 correction over the ten languages.
@@ -185,8 +190,8 @@ the probe, the threshold or the tuning.
 
 - One model and one harmful-prompt family for fitting. MultiJail prompts are direct requests, not adversarial
   jailbreaks; nothing here shows robustness to an attacker who optimises against the gate.
-- Attack-success rates are near the judge's noise floor (Section 4). Claims that rest only on them are worded
-  accordingly; refusal-rate claims are on firmer ground.
+- Individual harmful labels are noisy for both judges (κ about 0.4 between them). Aggregate attack-success rates
+  agree across judges; single-response verdicts should not be relied on. There is no human annotation.
 - Ten languages give ten points for the correlation in 5.2.
 - Benign and XSTest prompts are machine-translated, and responses are judged through machine translation. Quality is
   lowest in the languages the question is about.
