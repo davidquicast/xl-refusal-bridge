@@ -1,0 +1,124 @@
+{
+  "judge_id": "Qwen/Qwen2.5-7B-Instruct",
+  "reference": "Qwen/Qwen2.5-72B-Instruct, same rubric, hosted inference",
+  "n": 400,
+  "selected_variant": "zero_shot",
+  "variants": {
+    "zero_shot": {
+      "refusal/all": {
+        "n": 400,
+        "rate": 0.3075,
+        "ref_rate": 0.345,
+        "agreement": 0.8875,
+        "kappa": 0.7445068983120546
+      },
+      "refusal/harmful": {
+        "n": 140,
+        "rate": 0.6642857142857143,
+        "ref_rate": 0.7428571428571429,
+        "agreement": 0.8357142857142857,
+        "kappa": 0.6090335114118582
+      },
+      "refusal/benign": {
+        "n": 120,
+        "rate": 0.11666666666666667,
+        "ref_rate": 0.075,
+        "agreement": 0.9583333333333334,
+        "kappa": 0.7607655502348665
+      },
+      "refusal/xstest_safe": {
+        "n": 140,
+        "rate": 0.11428571428571428,
+        "ref_rate": 0.17857142857142858,
+        "agreement": 0.8785714285714286,
+        "kappa": 0.5182186234797254
+      },
+      "harmful/all": {
+        "n": 400,
+        "rate": 0.0425,
+        "ref_rate": 0.0225,
+        "agreement": 0.95,
+        "kappa": 0.20744997027608442
+      },
+      "harmful/harmful": {
+        "n": 140,
+        "rate": 0.04285714285714286,
+        "ref_rate": 0.04285714285714286,
+        "agreement": 0.9428571428571428,
+        "kappa": 0.30348258706097614
+      },
+      "harmful/benign": {
+        "n": 120,
+        "rate": 0.0,
+        "ref_rate": 0.0,
+        "agreement": 1.0,
+        "kappa": 0.0
+      },
+      "harmful/xstest_safe": {
+        "n": 140,
+        "rate": 0.07857142857142857,
+        "ref_rate": 0.02142857142857143,
+        "agreement": 0.9142857142857143,
+        "kappa": 0.11298838437052947
+      }
+    },
+    "few_shot": {
+      "refusal/all": {
+        "n": 400,
+        "rate": 0.295,
+        "ref_rate": 0.345,
+        "agreement": 0.885,
+        "kappa": 0.7365104822986906
+      },
+      "refusal/harmful": {
+        "n": 140,
+        "rate": 0.6785714285714286,
+        "ref_rate": 0.7428571428571429,
+        "agreement": 0.85,
+        "kappa": 0.6370370370354955
+      },
+      "refusal/benign": {
+        "n": 120,
+        "rate": 0.058333333333333334,
+        "ref_rate": 0.075,
+        "agreement": 0.9166666666666666,
+        "kappa": 0.3311036789271075
+      },
+      "refusal/xstest_safe": {
+        "n": 140,
+        "rate": 0.11428571428571428,
+        "ref_rate": 0.17857142857142858,
+        "agreement": 0.8928571428571429,
+        "kappa": 0.5748987854228205
+      },
+      "harmful/all": {
+        "n": 400,
+        "rate": 0.0075,
+        "ref_rate": 0.0225,
+        "agreement": 0.985,
+        "kappa": 0.4943109987191094
+      },
+      "harmful/harmful": {
+        "n": 140,
+        "rate": 0.0,
+        "ref_rate": 0.04285714285714286,
+        "agreement": 0.9571428571428572,
+        "kappa": 0.0
+      },
+      "harmful/benign": {
+        "n": 120,
+        "rate": 0.0,
+        "ref_rate": 0.0,
+        "agreement": 1.0,
+        "kappa": 0.0
+      },
+      "harmful/xstest_safe": {
+        "n": 140,
+        "rate": 0.02142857142857143,
+        "ref_rate": 0.02142857142857143,
+        "agreement": 1.0,
+        "kappa": 0.9999999999761557
+      }
+    }
+  }
+}
