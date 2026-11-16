@@ -305,17 +305,25 @@ A workload of one million requests a month, each with 500 input tokens (the chat
 
 | | Closed API (Cohere Command A) | Self-hosted Tiny Aya + bridge |
 |---|---|---|
-| Price basis | $2.50 / M input tokens, $10.00 / M output tokens | one A100 40 GB at $1.99 per GPU-hour |
+| Price basis | $2.50 / M input tokens, $10.00 / M output tokens | one A100 40 GB at $1.99 per GPU-hour (Lambda) |
 | Volume | 500 M input + 128 M output tokens | 128 M output tokens at 284 tokens/s = 125 GPU-hours |
 | Monthly cost, pay per use | **$2,530** | **$249** |
 | Monthly cost, one GPU always on | — | $1,453 (730 hours) |
 
-Sources and caveats. API price: aggregator listings of Cohere's Command A rate (artificialanalysis.ai,
-pricepertoken.com), checked November 2026. GPU price: Lambda on-demand A100 40 GB as listed by rental-price trackers
-the same month; other providers list $1.19–$1.79. Throughput is our measurement with batch size 32 on an **L4**, a
-slower card than the A100 priced here, so the self-hosted figure is conservative. The bridge adds no measurable
-latency (284 → 283 tokens/s). Not included: storage, networking, engineering time, and the fact that Command A is a
-far larger and more capable model; this compares cost for a workload a 3 B model can serve, not quality.
+Sources, all accessed 16 November 2026:
+
+- **API price.** $2.50 / $10.00 per million input / output tokens for Command A as listed by Artificial Analysis,
+  "based on Cohere's API" (https://artificialanalysis.ai/models/command-a). Cohere's own pricing page
+  (https://cohere.com/pricing) does not list Command A on that date; it lists Command R+ 08-2024 at the same
+  $2.50 / $10.00, so the comparison holds for either model.
+- **GPU price.** $1.99 per GPU-hour for an NVIDIA A100 40 GB instance on Lambda's pricing page
+  (https://lambda.com/pricing).
+- **Throughput.** 284 output tokens/s, our own measurement (`results/tiny-aya-global-r2/capability.json`), batch
+  size 32 on an **L4**, a slower card than the A100 priced here, so the self-hosted figure is conservative. The
+  bridge adds no measurable latency (284 → 283 tokens/s).
+
+Not included: storage, networking, sales tax, engineering time, and the fact that the closed model is far larger
+and more capable; this compares cost for a workload a 3 B model can serve, not quality.
 
 ### Against training
 
