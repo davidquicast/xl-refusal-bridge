@@ -61,6 +61,17 @@ class Session:
             self._judge = Judge(self.cfg)
         return self._judge
 
+    def release_aux(self):
+        """Free the judge and the translator (stages that only need the model under test)."""
+        import gc
+
+        import torch
+
+        self._tr = self._judge = None
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
 
 def stage(cfg: Cfg, name: str, force: bool = False) -> bool:
     """True if the stage must run."""
@@ -143,11 +154,13 @@ def do_fit(cfg: Cfg):
         # Probe variants for the ablations (same layer, own threshold at the same benign FPR).
         w_en = F.fit_probe(A, L_d, ch["beta"], ch["lam"], ["en"])
         w_b0 = F.fit_probe(A, L_d, 0.0, ch["lam"], A.langs)
-        np.savez(out / "fit.npz", w=w, w_en=w_en, w_beta0=w_b0,
+        w_nh = F.fit_probe(A, L_d, ch["beta"], ch["lam"], A.langs, hard=False)
+        np.savez(out / "fit.npz", w=w, w_en=w_en, w_beta0=w_b0, w_nohard=w_nh,
                  **{f"r.{L}": r[L] for L in r})
         info = {"L_d": L_d, "beta": ch["beta"], "lam": ch["lam"], "tau": tau,
                 "tau_en": F.gate_threshold(A, w_en, L_d, cfg.gate_fpr),
                 "tau_beta0": F.gate_threshold(A, w_b0, L_d, cfg.gate_fpr),
+                "tau_nohard": F.gate_threshold(A, w_nh, L_d, 0.02, pool=("benign",)),
                 "L_star": L_star, "lr_ranking": ranking, "m_star": m_star, "m0": m0,
                 "probe_selection": ch, "probe_table": sel["table"]}
         (out / "fit.json").write_text(json.dumps(info, indent=2))
@@ -197,12 +210,32 @@ def evaluate(cfg: Cfg, S: Session, rows: list[dict], ctx=None, native: bool = Fa
     from .activations import generate
     from .judge import judge_rows
 
-    model, tok = S.lm
-    outs, gates = generate(model, tok, [r["text"] for r in rows], cfg.max_new_tokens, cfg.gen_batch,
-                           ctx=ctx, return_gate=True)
-    for r, o, g in zip(rows, outs, gates):
-        r["response"], r["gate"] = o, g
+    todo = [r for r in rows if r.get("response") is None]
+    if todo:
+        model, tok = S.lm
+        outs, gates = generate(model, tok, [r["text"] for r in todo], cfg.max_new_tokens, cfg.gen_batch,
+                               ctx=ctx, return_gate=True)
+        for r, o, g in zip(todo, outs, gates):
+            r["response"], r["gate"] = o, g
     return judge_rows(cfg, rows, S.tr, S.judge, native=native)
+
+
+def _reuse(cfg: Cfg, cond: str, split: str, rows: list[dict]) -> int:
+    """Copy generations (not verdicts) of an earlier protocol revision for conditions that do not
+    depend on the probe: the unmodified model and the SafeTune baselines."""
+    if not cfg.reuse_tag or not (cond == "base" or cond.startswith(("st_", "tune_st_"))):
+        return 0
+    try:
+        old = {r["id"]: r for r in read_jsonl(pull(cfg, f"eval/{cfg.reuse_tag}/{cond}_{split}.jsonl"))}
+    except Exception:  # noqa: BLE001 - nothing to reuse
+        return 0
+    n = 0
+    for r in rows:
+        o = old.get(r["id"])
+        if o and o.get("response") is not None and o.get("text") == r["text"]:
+            r["response"], r["gate"], r["response_en"] = o["response"], o.get("gate"), o.get("response_en")
+            n += 1
+    return n
 
 
 def do_eval(cfg: Cfg, S: Session, cond: str, ctx=None, split="test", langs=None, labels=None, n=None,
@@ -219,13 +252,15 @@ def do_eval(cfg: Cfg, S: Session, cond: str, ctx=None, split="test", langs=None,
     with run(cfg, name) as rec:
         rows = select_rows(cfg, split, langs, labels or ("harmful", "benign", "xstest_safe"), n)
         t0 = time.time()
+        reused = _reuse(cfg, cond, split, rows)
         rows = evaluate(cfg, S, rows, ctx=ctx, native=native)
         for r in rows:
             r["cond"] = cond
         write_jsonl(out, rows)
         push(cfg, out, f"eval/{cfg.tag}/{cond}_{split}.jsonl")
         s = summarize(rows)
-        rec["metrics"] = {"n": len(rows), "seconds": round(time.time() - t0, 1), **(extra or {}),
+        rec["metrics"] = {"n": len(rows), "seconds": round(time.time() - t0, 1), "reused_generations": reused,
+                          **(extra or {}),
                           **{k: v for k, v in s.items() if k != "per_lang"},
                           "asr": {l: round(d["asr"], 3) for l, d in s["per_lang"].items()},
                           "orr_benign": {l: round(d["orr_benign"], 3) for l, d in s["per_lang"].items()}}
@@ -292,6 +327,7 @@ def variants(cfg: Cfg, spec: BridgeSpec, w, r) -> dict:
         "abl_randdir": (spec, w, r_rand),
         "abl_enprobe": (replace(spec, tau=info["tau_en"]), z["w_en"], r),
         "abl_beta0": (replace(spec, tau=info["tau_beta0"]), z["w_beta0"], r),
+        "abl_nohardneg": (replace(spec, tau=info["tau_nohard"]), z["w_nohard"], r),
     }
 
 
@@ -438,8 +474,7 @@ def run_a(cfg: Cfg, quick: bool = False):
     do_report(cfg)
     for name, (sp, ww, rr) in variants(cfg, spec, w, r).items():
         try:
-            do_eval(cfg, S, name, Bridge(model, sp, ww, rr), "test", ABL_LANGS, ("harmful", "benign"),
-                    n=n or 100)
+            do_eval(cfg, S, name, Bridge(model, sp, ww, rr), "test", ABL_LANGS, n=n or 100)
         except Exception as e:  # noqa: BLE001 - one ablation must not sink the run
             print(f"[warn] ablation {name} failed: {type(e).__name__}: {e}")
     do_report(cfg)
@@ -480,7 +515,7 @@ def main():
         import os
 
         assert os.environ.get("XLRB_NS"), "--quick needs XLRB_NS so it cannot mark real stages as done"
-        cfg.n_train, cfg.n_val, cfg.n_test, cfg.n_xstest_val = 12, 6, 6, 6
+        cfg.n_train, cfg.n_val, cfg.n_test, cfg.n_xstest_train, cfg.n_xstest_val = 12, 6, 6, 6, 4
         cfg.ld_grid, cfg.beta_grid, cfg.lam_grid, cfg.c_grid = [8, 16], [1.0], [1e-2], [1.0]
         cfg.max_new_tokens = 48
     if a.stage == "bench":

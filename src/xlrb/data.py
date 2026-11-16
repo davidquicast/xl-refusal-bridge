@@ -242,7 +242,7 @@ def build(cfg: Cfg, out_dir: str | Path, limit: int | None = None, mt=None) -> d
         pids = sorted({r["prompt_id"] for r in rows if r["label"] == label})
         rng.shuffle(pids)
         if label == "xstest_safe":
-            cuts = [("val", cfg.n_xstest_val), ("test", len(pids))]
+            cuts = [("train", cfg.n_xstest_train), ("val", cfg.n_xstest_val), ("test", len(pids))]
         else:
             cuts = [("train", cfg.n_train), ("val", cfg.n_val), ("test", len(pids))]
         i = 0

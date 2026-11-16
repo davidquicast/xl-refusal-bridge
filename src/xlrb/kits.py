@@ -211,12 +211,13 @@ def capability(cfg: Cfg, S, n=None):
     model, tok = S.lm
     spec, w, r = final_bridge(cfg, model)
     br = Bridge(model, spec, w, r)
+    S.release_aux()
     with run(cfg, name) as rec:
         items = belebele(cfg, n or 100)
         res: dict = {}
         preds = {}
         for cond, ctx in (("base", None), ("bridge", br)):
-            outs = generate(model, tok, [x["prompt"] for x in items], 6, cfg.gen_batch, ctx=ctx)
+            outs = generate(model, tok, [x["prompt"] for x in items], 6, 8, ctx=ctx)
             preds[cond] = [_digit(o) for o in outs]
             res[f"belebele_acc_{cond}"] = {
                 l: float(np.mean([p == x["target"] for p, x in zip(preds[cond], items) if x["lang"] == l]))

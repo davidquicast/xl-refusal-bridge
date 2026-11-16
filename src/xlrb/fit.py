@@ -99,13 +99,24 @@ def refusal_dirs(A: Acts, langs: list[str] = ("en",)) -> tuple[dict[int, np.ndar
     return r, m_star, m0
 
 
-def fit_probe(A: Acts, L: int, beta: float, lam: float, langs: list[str]) -> np.ndarray:
-    return lda_probe([A.get(l, "harmful", "train", L) for l in langs],
-                     [A.get(l, "benign", "train", L) for l in langs], beta, lam)
+def fit_probe(A: Acts, L: int, beta: float, lam: float, langs: list[str], hard: bool = True) -> np.ndarray:
+    """`hard=True` adds XSTest-safe training prompts (look unsafe, are safe) to the negative class,
+    so the probe has to separate harmful intent from merely alarming vocabulary."""
+    neg = []
+    for l in langs:
+        B = A.get(l, "benign", "train", L)
+        if hard and (l, "xstest_safe") in A.acts:
+            B = np.concatenate([B, A.get(l, "xstest_safe", "train", L)])
+        neg.append(B)
+    return lda_probe([A.get(l, "harmful", "train", L) for l in langs], neg, beta, lam)
 
 
 def per_lang_auroc(A: Acts, v: np.ndarray, L: int, split: str, neg: str = "benign") -> dict[str, float]:
-    return {l: auroc(A.get(l, "harmful", split, L) @ v, A.get(l, neg, split, L) @ v) for l in A.langs}
+    """neg: "benign", "xstest_safe", or "pool" (both)."""
+    labs = ("benign", "xstest_safe") if neg == "pool" else (neg,)
+    return {l: auroc(A.get(l, "harmful", split, L) @ v,
+                     np.concatenate([A.get(l, lab, split, L) @ v for lab in labs if (l, lab) in A.acts]))
+            for l in A.langs}
 
 
 def select_probe(A: Acts, ld_grid, beta_grid, lam_grid, train_langs: list[str] | None = None) -> dict:
@@ -118,7 +129,7 @@ def select_probe(A: Acts, ld_grid, beta_grid, lam_grid, train_langs: list[str] |
         for beta in beta_grid:
             for lam in lam_grid:
                 w = fit_probe(A, L, beta, lam, train_langs)
-                au = per_lang_auroc(A, w, L, "val")
+                au = per_lang_auroc(A, w, L, "val", neg="pool")
                 row = {"L_d": L, "beta": beta, "lam": lam, "min": min(au.values()),
                        "mean": float(np.mean(list(au.values())))}
                 table.append(row)
@@ -128,8 +139,9 @@ def select_probe(A: Acts, ld_grid, beta_grid, lam_grid, train_langs: list[str] |
     return {"choice": best[1], "w": best[2], "table": table}
 
 
-def gate_threshold(A: Acts, w: np.ndarray, L: int, fpr: float, pool: tuple[str, ...] = ("benign",)) -> float:
-    s = np.concatenate([A.get(l, lab, "val", L) @ w for l in A.langs for lab in pool])
+def gate_threshold(A: Acts, w: np.ndarray, L: int, fpr: float,
+                   pool: tuple[str, ...] = ("benign", "xstest_safe")) -> float:
+    s = np.concatenate([A.get(l, lab, "val", L) @ w for l in A.langs for lab in pool if (l, lab) in A.acts])
     return float(np.quantile(s, 1 - fpr))
 
 
@@ -158,6 +170,9 @@ def analysis(A: Acts, r_en, m_star, m0, w, L_d: int, tau: float, beta: float, la
     out["D_test_leave_one_language_out"] = lolo
     w_en = fit_probe(A, L_d, beta, lam, ["en"])
     out["D_test_english_only_probe"] = per_lang_auroc(A, w_en, L_d, "test")
+    out["D_test_xstest_english_only_probe"] = per_lang_auroc(A, w_en, L_d, "test", neg="xstest_safe")
+    w_nh = fit_probe(A, L_d, beta, lam, A.langs, hard=False)
+    out["D_test_xstest_no_hard_negatives"] = per_lang_auroc(A, w_nh, L_d, "test", neg="xstest_safe")
     # Gate behaviour at the chosen threshold (pure activation-level; no generation needed).
     out["gate_tpr_test"] = {l: float((A.get(l, "harmful", "test", L_d) @ w > tau).mean()) for l in A.langs}
     out["gate_fpr_test"] = {l: float((A.get(l, "benign", "test", L_d) @ w > tau).mean()) for l in A.langs}

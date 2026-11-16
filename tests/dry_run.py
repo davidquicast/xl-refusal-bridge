@@ -13,7 +13,7 @@ from xlrb import cli
 from xlrb.common import LANG_CODES, LANGS, Cfg, push, write_jsonl
 
 cfg = Cfg(hf_user="test", model_id="hf-internal-testing/tiny-random-gpt2")
-cfg.n_train, cfg.n_val, cfg.n_test, cfg.n_xstest_val = 12, 6, 8, 4
+cfg.n_train, cfg.n_val, cfg.n_test, cfg.n_xstest_train, cfg.n_xstest_val = 12, 6, 8, 4, 4
 cfg.ld_grid, cfg.lr_range, cfg.c_grid = [0, 1], (2, 3), [1.0, 1.5]
 cfg.beta_grid, cfg.lam_grid = [0.0, 1.0], [1e-1]
 cfg.max_new_tokens, cfg.gen_batch, cfg.act_batch = 6, 16, 16
@@ -25,7 +25,7 @@ rows = []
 for label, n in (("harmful", 26), ("benign", 26), ("xstest_safe", 12)):
     for i in range(n):
         if label == "xstest_safe":
-            split = "val" if i < 4 else "test"
+            split = "train" if i < 4 else "val" if i < 8 else "test"
         else:
             split = "train" if i < 12 else "val" if i < 18 else "test"
         en = f"please {rng.choice(words[label])} number {i} now"

@@ -10,7 +10,7 @@ TIER_COLOR = {"ref": "#444444", "high": "#2a7fbf", "mid": "#d98c1f", "low": "#c0
 COND_NAME = {"base": "Tiny Aya (base)", "bridge": "+ gated bridge (ours)", "st_refdir": "SafeTune refusal direction",
              "st_cast": "SafeTune CAST", "abl_add": "ablation: additive", "abl_nogate": "ablation: no gate",
              "abl_randdir": "ablation: random direction", "abl_enprobe": "ablation: English-only probe",
-             "abl_beta0": "ablation: beta = 0"}
+             "abl_beta0": "ablation: beta = 0", "abl_nohardneg": "ablation: no hard negatives in the probe"}
 
 
 def pct(x) -> str:
