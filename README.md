@@ -11,6 +11,7 @@ Model under test: [`CohereLabs/tiny-aya-global`](https://huggingface.co/CohereLa
 | Benchmark | https://huggingface.co/datasets/davidquicast/xl-refusal-bench |
 | Adapter | https://huggingface.co/davidquicast/tiny-aya-xl-refusal-bridge |
 | Demo | https://huggingface.co/spaces/davidquicast/xl-refusal-bridge |
+| Run logs | https://huggingface.co/datasets/davidquicast/xl-refusal-bridge-logs |
 
 ## The question
 
