@@ -51,7 +51,7 @@ is harmful, and a "bridge" that, only when the detector fires, lifts the refusal
 ## Try the demo
 
 Pick a language and a prompt type and compare, side by side, what Tiny Aya answers with and without the bridge.
-[Open it in a new tab](https://huggingface.co/spaces/davidquicast/xl-refusal-bridge) if it does not load below.
+**[Open the demo](https://huggingface.co/spaces/davidquicast/xl-refusal-bridge)**.
 
 <iframe
    src="https://davidquicast-xl-refusal-bridge.hf.space"
@@ -60,7 +60,7 @@ Pick a language and a prompt type and compare, side by side, what Tiny Aya answe
    height="760px"
 ></iframe>
 
-The benchmark, browsable:
+Browse the benchmark: **[xl-refusal-bench](https://huggingface.co/datasets/davidquicast/xl-refusal-bench)**.
 
 <iframe
    src="https://huggingface.co/datasets/davidquicast/xl-refusal-bench/embed/viewer/default/train"
