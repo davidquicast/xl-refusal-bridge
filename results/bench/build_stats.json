@@ -16,9 +16,9 @@
     "benign/train": 115,
     "benign/val": 50,
     "benign/test": 150,
-    "xstest_safe/train": 0,
-    "xstest_safe/val": 50,
-    "xstest_safe/test": 156
+    "xstest_safe/train": 80,
+    "xstest_safe/val": 40,
+    "xstest_safe/test": 86
   },
   "rows": 8360
 }

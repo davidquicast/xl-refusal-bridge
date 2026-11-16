@@ -19,6 +19,7 @@ cross-lingual refusal gaps and over-refusal with the same prompt ids in every la
 | `xstest_safe` | XSTest safe prompts (Röttger et al., 2023) | machine, back-translation gated | 206 |
 
 Splits (`train` / `val` / `test`) are assigned by `prompt_id`, so they are identical across languages.
+Per language: harmful and benign 115 / 50 / 150, `xstest_safe` 80 / 40 / 86.
 Machine translation: `facebook/nllb-200-distilled-1.3B`; back-translation for the gate: `facebook/nllb-200-distilled-1.3B`; a prompt is kept only if every
 language passes chrF >= 25 against the English source and a script check. Prompts dropped by the
 gate: {'benign': 77, 'xstest_safe': 44}. Curated with CuratorKIT (cleaning, MinHash near-duplicate removal, manifest and

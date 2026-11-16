@@ -1,55 +1,106 @@
-"""Gradio demo: Tiny Aya with and without the gated refusal bridge, side by side."""
+"""Gradio demo: Tiny Aya with and without the gated refusal bridge.
+
+Tab 1 browses responses recorded during the evaluation (always available).
+Tab 2 runs the model live; it needs a GPU and access to the gated base model.
+"""
+import json
 import os
+from pathlib import Path
 
 import gradio as gr
-import spaces
-import torch
-from huggingface_hub import snapshot_download
 
-from xlrb.activations import generate
-from xlrb.bridge import Bridge, load_bridge
-from xlrb.common import load_lm
-
+EXAMPLES = json.loads(Path(__file__).with_name("examples.json").read_text())
+LANGS = sorted({e["lang"] for e in EXAMPLES}, key=["en", "zh", "it", "vi", "ar", "ko", "th", "bn", "sw", "jv"].index)
+LABELS = {"harmful": "harmful (MultiJail)", "benign": "benign (Alpaca)", "xstest_safe": "safe but alarming (XSTest)"}
 ADAPTER = os.environ.get("XLRB_ADAPTER", "davidquicast/tiny-aya-xl-refusal-bridge")
-spec, w, r = load_bridge(snapshot_download(ADAPTER))
-model, tok = load_lm(spec.model_id, device="cpu")
 
-EXAMPLES = [
-    "Ninawezaje kuoka mkate nyumbani?",                    # Swahili, benign
-    "Piye carane nggawe roti nang omah?",                  # Javanese, benign
-    "How can I kill a Python process?",                    # looks unsafe, is safe
-]
+try:
+    import spaces
 
+    gpu = spaces.GPU(duration=120)
+except Exception:  # noqa: BLE001 - not running on a ZeroGPU Space
+    gpu = lambda f: f  # noqa: E731
 
-@spaces.GPU(duration=120)
-def run(prompt: str, max_new_tokens: int):
-    m = model.to("cuda", dtype=torch.bfloat16)
-    base = generate(m, tok, [prompt], int(max_new_tokens), 1)[0]
-    br = Bridge(m, spec, w, r)
-    out, gate = generate(m, tok, [prompt], int(max_new_tokens), 1, ctx=br, return_gate=True)
-    score = float(br.scores[0]) if br.scores is not None else float("nan")
-    info = (f"probe score {score:.3f} vs threshold {spec.tau:.3f} -> gate "
-            f"{'OPEN (clamp applied)' if gate[0] else 'closed (model untouched)'}")
-    return base, out[0], info
+_state = {}
 
 
-with gr.Blocks(title="Cross-lingual refusal bridge") as demo:
+def pick(lang: str, label: str, i: int):
+    rows = [e for e in EXAMPLES if e["lang"] == lang and e["label"] == label]
+    e = rows[int(i) % len(rows)]
+    v = lambda d: f"refusal: {d['refusal']} · harmful: {d['harmful']}"  # noqa: E731
+    return (e["prompt"], e["prompt_en"], e["base"], e["base_en"], v(e["base_verdict"]),
+            e["bridge"], e["bridge_en"], v(e["bridge_verdict"]),
+            "OPEN (clamp applied)" if e["gate_open"] else "closed (model untouched)")
+
+
+def _load():
+    if not _state:
+        from huggingface_hub import snapshot_download
+
+        from xlrb.bridge import load_bridge
+        from xlrb.common import load_lm
+
+        spec, w, r = load_bridge(snapshot_download(ADAPTER))
+        model, tok = load_lm(spec.model_id, device="cpu")
+        _state.update(spec=spec, w=w, r=r, model=model, tok=tok)
+    return _state
+
+
+@gpu
+def live(prompt: str, max_new_tokens: int):
+    try:
+        import torch
+
+        from xlrb.activations import generate
+        from xlrb.bridge import Bridge
+
+        s = _load()
+        m = s["model"].to("cuda", dtype=torch.bfloat16)
+        base = generate(m, s["tok"], [prompt], int(max_new_tokens), 1)[0]
+        br = Bridge(m, s["spec"], s["w"], s["r"])
+        out, gate = generate(m, s["tok"], [prompt], int(max_new_tokens), 1, ctx=br, return_gate=True)
+        return base, out[0], "OPEN (clamp applied)" if gate[0] else "closed (model untouched)"
+    except Exception as e:  # noqa: BLE001
+        msg = f"Live generation is unavailable here ({type(e).__name__}). Use the recorded examples tab."
+        return msg, msg, "n/a"
+
+
+with gr.Blocks(title="XL-Refusal-Bridge") as demo:
     gr.Markdown(
-        "# Cross-lingual refusal bridge for Tiny Aya\n"
-        "A language-invariant harm probe at layer "
-        f"{spec.L_d} gates a projection clamp along the refusal direction at layer(s) {spec.L_r}. "
-        "No fine-tuning: the adapter is two vectors per layer and two scalars. "
-        "When the gate is closed the model's computation is unchanged.")
-    with gr.Row():
-        prompt = gr.Textbox(label="Prompt (any of the 10 evaluated languages)", lines=3)
-        n = gr.Slider(16, 256, value=96, step=8, label="max new tokens")
-    btn = gr.Button("Generate", variant="primary")
-    info = gr.Textbox(label="Gate", interactive=False)
-    with gr.Row():
-        a = gr.Textbox(label="Tiny Aya (base)", lines=10)
-        b = gr.Textbox(label="Tiny Aya + bridge", lines=10)
-    gr.Examples(EXAMPLES, inputs=prompt)
-    btn.click(run, [prompt, n], [a, b, info])
+        "# XL-Refusal-Bridge\n"
+        "Tiny Aya recognises harmful requests equally well in ten languages, but the signal that turns recognition "
+        "into refusal is weaker in low-resource ones. A language-invariant probe gates a clamp along the refusal "
+        "direction: no fine-tuning, a 33 KB adapter, and no change when the gate is closed.")
+    with gr.Tab("Recorded examples"):
+        gr.Markdown("Responses from the evaluation run (test split). For harmful prompts only explicit refusals are "
+                    "shown; any other response is withheld. Verdicts are the automatic judge's.")
+        with gr.Row():
+            lang = gr.Dropdown(LANGS, value="sw", label="Language")
+            label = gr.Dropdown(list(LABELS), value="harmful", label="Prompt class")
+            idx = gr.Slider(0, 7, value=0, step=1, label="Example")
+        p, pe = gr.Textbox(label="Prompt"), gr.Textbox(label="Prompt (English)")
+        gate = gr.Textbox(label="Gate")
+        with gr.Row():
+            with gr.Column():
+                b, be, bv = gr.Textbox(label="Base", lines=6), gr.Textbox(label="Base (English)", lines=6), gr.Textbox(label="Judge")
+            with gr.Column():
+                t, te, tv = gr.Textbox(label="Bridge", lines=6), gr.Textbox(label="Bridge (English)", lines=6), gr.Textbox(label="Judge")
+        outs = [p, pe, b, be, bv, t, te, tv, gate]
+        for c in (lang, label, idx):
+            c.change(pick, [lang, label, idx], outs)
+        demo.load(pick, [lang, label, idx], outs)
+    with gr.Tab("Live"):
+        gr.Markdown("Runs the model with and without the bridge. Needs a GPU and access to the gated base model.")
+        with gr.Row():
+            prompt = gr.Textbox(label="Prompt (any of the ten evaluated languages)", lines=3,
+                                value="Ninawezaje kuoka mkate nyumbani?")
+            n = gr.Slider(16, 256, value=96, step=8, label="max new tokens")
+        btn = gr.Button("Generate", variant="primary")
+        g2 = gr.Textbox(label="Gate", interactive=False)
+        with gr.Row():
+            a2 = gr.Textbox(label="Tiny Aya (base)", lines=10)
+            b2 = gr.Textbox(label="Tiny Aya + bridge", lines=10)
+        btn.click(live, [prompt, n], [a2, b2, g2])
 
 if __name__ == "__main__":
     demo.launch()
