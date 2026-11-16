@@ -239,23 +239,38 @@ def _reuse(cfg: Cfg, cond: str, split: str, rows: list[dict]) -> int:
 
 
 def do_eval(cfg: Cfg, S: Session, cond: str, ctx=None, split="test", langs=None, labels=None, n=None,
-            native=False, extra: dict | None = None) -> dict:
-    """Generate + judge one condition; writes eval/{tag}/{cond}_{split}.jsonl and returns its summary."""
+            native=False, extra: dict | None = None, sig: str | None = None) -> dict:
+    """Generate + judge one condition; writes eval/{tag}/{cond}_{split}.jsonl and returns its summary.
+
+    A finished condition is re-judged (generations kept) when the judge revision changed, and fully
+    re-run when `sig`, the signature of the intervention it was generated with, changed.
+    """
+    from .judge import JUDGE_REV
     from .metrics import summarize
 
     name = f"eval_{cfg.tag}_{cond}_{split}"
     out = cfg.wdir("eval", cfg.tag, f"{cond}_{split}.jsonl")
-    if not stage(cfg, name):
-        if not out.exists():
-            out = pull(cfg, f"eval/{cfg.tag}/{cond}_{split}.jsonl")
-        return summarize(read_jsonl(out))
+    rows = None
+    if is_done(cfg, name):
+        rows = read_jsonl(pull(cfg, f"eval/{cfg.tag}/{cond}_{split}.jsonl"))
+        if sig is not None and any(r.get("sig") != sig for r in rows):
+            print(f"[redo] {name}: intervention changed")
+            rows = None
+        elif all(r.get("judge_rev") == JUDGE_REV for r in rows):
+            print(f"[skip] {name} already done")
+            return summarize(rows)
+        else:
+            print(f"[rejudge] {name}: judge revision changed")
     with run(cfg, name) as rec:
-        rows = select_rows(cfg, split, langs, labels or ("harmful", "benign", "xstest_safe"), n)
         t0 = time.time()
-        reused = _reuse(cfg, cond, split, rows)
+        if rows is None:
+            rows = select_rows(cfg, split, langs, labels or ("harmful", "benign", "xstest_safe"), n)
+            reused = _reuse(cfg, cond, split, rows)
+        else:
+            reused = len(rows)
         rows = evaluate(cfg, S, rows, ctx=ctx, native=native)
         for r in rows:
-            r["cond"] = cond
+            r["cond"], r["sig"] = cond, sig
         write_jsonl(out, rows)
         push(cfg, out, f"eval/{cfg.tag}/{cond}_{split}.jsonl")
         s = summarize(rows)
@@ -268,9 +283,21 @@ def do_eval(cfg: Cfg, S: Session, cond: str, ctx=None, split="test", langs=None,
 
 
 # ----------------------------------------------------------------------------- tune
+def tune_name(cfg: Cfg) -> str:
+    """The selection depends on the judge's verdicts, so its done-marker carries the judge revision."""
+    from .judge import JUDGE_REV
+
+    return f"tune_{cfg.tag}_{JUDGE_REV}"
+
+
+def spec_sig(spec: BridgeSpec, tag: str = "") -> str:
+    return f"{tag}L{spec.L_r}c{spec.c}tau{spec.tau:.5f}{spec.mode}{spec.gate}"
+
+
+
 def do_tune(cfg: Cfg, S: Session):
     """Pick (L_r set, c) on validation: lowest macro ASR subject to benign over-refusal <= base + 4 pp."""
-    name = f"tune_{cfg.tag}"
+    name = tune_name(cfg)
     out = cfg.wdir("fit", cfg.tag, "bridge", "x").parent
     if not stage(cfg, name):
         return
@@ -287,7 +314,8 @@ def do_tune(cfg: Cfg, S: Session):
                 spec = BridgeSpec(L_d=info["L_d"], L_r=lr, tau=info["tau"], c=c, model_id=cfg.model_id,
                                   m_star={str(x): info["m_star"][x] for x in lr})
                 cond = f"tune_L{'-'.join(map(str, lr))}_c{c}"
-                s = do_eval(cfg, S, cond, Bridge(model, spec, z["w"], r), "val", TUNE_LANGS, labels)
+                s = do_eval(cfg, S, cond, Bridge(model, spec, z["w"], r), "val", TUNE_LANGS, labels,
+                            sig=spec_sig(spec))
                 row = {"L_r": lr, "c": c, "asr": s["asr_macro"], "orr_benign": s["orr_benign_macro"],
                        "asr_per_lang": {l: d["asr"] for l, d in s["per_lang"].items()}}
                 table.append(row)
@@ -470,11 +498,13 @@ def run_a(cfg: Cfg, quick: bool = False):
     do_tune(cfg, S)
     model, _ = S.lm
     spec, w, r = final_bridge(cfg, model)
-    do_eval(cfg, S, "bridge", Bridge(model, spec, w, r), "test", n=n, extra={"spec": asdict(spec)})
+    do_eval(cfg, S, "bridge", Bridge(model, spec, w, r), "test", n=n, extra={"spec": asdict(spec)},
+            sig=spec_sig(spec))
     do_report(cfg)
     for name, (sp, ww, rr) in variants(cfg, spec, w, r).items():
         try:
-            do_eval(cfg, S, name, Bridge(model, sp, ww, rr), "test", ABL_LANGS, n=n or 100)
+            do_eval(cfg, S, name, Bridge(model, sp, ww, rr), "test", ABL_LANGS, n=n or 100,
+                    sig=spec_sig(sp, name))
         except Exception as e:  # noqa: BLE001 - one ablation must not sink the run
             print(f"[warn] ablation {name} failed: {type(e).__name__}: {e}")
     do_report(cfg)

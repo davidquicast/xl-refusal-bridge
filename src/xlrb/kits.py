@@ -201,13 +201,13 @@ def capability(cfg: Cfg, S, n=None):
 
     from .activations import first_token_logprobs, generate
     from .bridge import Bridge
-    from .cli import final_bridge, stage
+    from .cli import final_bridge, stage, tune_name
     from .common import wait_for
 
     name = f"capability_{cfg.tag}"
     if not stage(cfg, name):
         return
-    wait_for(cfg, f"tune_{cfg.tag}")
+    wait_for(cfg, tune_name(cfg))
     model, tok = S.lm
     spec, w, r = final_bridge(cfg, model)
     br = Bridge(model, spec, w, r)
@@ -264,7 +264,7 @@ def capability(cfg: Cfg, S, n=None):
 def audit_redteam(cfg: Cfg, S, n=None):
     from .activations import generate
     from .bridge import Bridge
-    from .cli import final_bridge, stage
+    from .cli import final_bridge, stage, tune_name
     from .common import wait_for
 
     name = f"redteam_{cfg.tag}"
@@ -272,7 +272,7 @@ def audit_redteam(cfg: Cfg, S, n=None):
         return
     from auditkit.redteam import RedTeamRunner
 
-    wait_for(cfg, f"tune_{cfg.tag}")
+    wait_for(cfg, tune_name(cfg))
     model, tok = S.lm
     spec, w, r = final_bridge(cfg, model)
     br = Bridge(model, spec, w, r)

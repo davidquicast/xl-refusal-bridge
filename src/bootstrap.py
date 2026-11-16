@@ -58,8 +58,15 @@ code = snapshot_download(OPS, repo_type="dataset", allow_patterns=["code/*"], lo
 env = {"XLRB_HF_USER": USER, "PYTHONPATH": "/content/xlrb_code/code/src",
        "XLRB_CODE_SHA": open("/content/xlrb_code/code/CODE_SHA").read().strip(), "PYTHONUNBUFFERED": "1"}
 sh("nvidia-smi --query-gpu=name,memory.total --format=csv")
+flags = open("/content/xlrb_code/code/FLAGS").read().split() if os.path.exists("/content/xlrb_code/code/FLAGS") else []
+if f"judgecheck_{SESSION}" in flags:      # validate the judge against reference labels before anything else
+    sh("python -u -m xlrb.judgecheck", {**env, "XLRB_WORK": "/content/xlrb_work"})
+    upload_log()
 ns = "quick_" + env["XLRB_CODE_SHA"]
-rc = sh(f"python -u -m xlrb.cli run_{SESSION} --quick", {**env, "XLRB_NS": ns, "XLRB_WORK": "/content/xlrb_quick"})
+if f"skip_quick_{SESSION}" in flags:      # only for relaunches whose change the offline dry run covers
+    rc = 0
+else:
+    rc = sh(f"python -u -m xlrb.cli run_{SESSION} --quick", {**env, "XLRB_NS": ns, "XLRB_WORK": "/content/xlrb_quick"})
 open(LOG, "a").write(f"[bootstrap] smoke test exit code {rc}\n")
 upload_log()
 if rc == 0:
