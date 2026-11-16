@@ -1,0 +1,272 @@
+# Tiny Aya knows it is harmful in Javanese. It just does not act on it as firmly.
+
+*A detect–route dissociation in multilingual refusal, and a two-vector adapter that uses it.*
+
+Lexsi AI Safety and Alignment Hackathon · Track 2 · model: `CohereLabs/tiny-aya-global`
+Kits used: CuratorKIT → SafeTune → CircuitKIT → AuditKIT
+
+## Summary
+
+- **Detection is language-invariant.** One linear probe at layer 20 separates harmful from benign prompts with
+  AUROC 0.988–0.996 in all ten languages. Trained with any one language held out, it scores 0.988–0.994 on that
+  language.
+- **Routing is not.** The projection of harmful prompts onto the English refusal direction keeps its *sign* in every
+  language but loses *size*: at the steering layer the margin relative to English falls from 0.98 (English) to
+  0.55–0.73 for the six high- and mid-resource languages and 0.46–0.54 for Bengali, Swahili and Javanese.
+- **The shrinkage tracks unsafe behaviour; detection quality does not.** Across the ten languages, baseline attack
+  success correlates with routing margin (Spearman ρ = −0.77) and not with detection AUROC (ρ = −0.07). Ten points is
+  a small sample; we read this as support, not proof.
+- **A gated clamp closes the gap.** Using the probe to gate a projection clamp along the refusal direction takes
+  macro attack success from 5.4 % to 0.1 % and refusal of harmful prompts from 69.9 % to 95.6 %. The worst-language
+  gap to English goes from 9.3 pp to 0.7 pp.
+- **It costs over-refusal on alarming-but-safe prompts.** Refusal of benign instructions moves from 6.0 % to 8.2 %
+  (not significant in any language); refusal of XSTest-safe prompts moves from 17.6 % to 24.4 % (significant in
+  Bengali and Javanese).
+- **It transfers.** On a different prompt source (SORRY-Bench) and six languages never used to fit anything, attack
+  success falls from 9.0 % to 1.3 %.
+
+The adapter is one probe vector, three direction vectors and two scalars. No weights are changed, and when the gate
+is closed the forward pass is identical to the base model.
+
+## 1. Question
+
+Multilingual models are less safe in low-resource languages. The usual explanation is that the model "understands
+less" there. We test a more specific claim: that the model recognises harm equally well everywhere, and what degrades
+is the step that turns recognition into refusal. If so, safety can be repaired by connecting the two, without
+retraining.
+
+Three hypotheses, each stated so that it can fail:
+
+- **H1** — a single linear detector of harmful intent works equally well in every language, including unseen ones.
+- **H2** — the refusal signal is weaker in low-resource languages, and its weakness predicts unsafe responses.
+- **H3** — gating a refusal-direction clamp on the detector removes the cross-lingual gap at low cost.
+
+## 2. Benchmark (CuratorKIT)
+
+`xl-refusal-bench` holds the same prompts in ten languages: English, Chinese, Italian, Vietnamese, Arabic, Korean,
+Thai, Bengali, Swahili, Javanese.
+
+| Class | Source | Prompts per language | Translation |
+|---|---|---|---|
+| Harmful | MultiJail | 315 | human (from the source) |
+| Benign | Alpaca, instructions without input | 315 | NLLB-200 1.3B |
+| Safe but alarming | XSTest, safe subset | 206 | NLLB-200 1.3B |
+
+A machine-translated prompt survives only if its back-translation reaches chrF ≥ 25 and it is in the expected script
+in *every* language; otherwise it is dropped from all of them. That removed 77 benign and 44 XSTest prompts and keeps
+the languages exactly parallel. CuratorKIT cleans and de-duplicates the English side and writes the dataset card.
+Splits are by prompt: harmful and benign 115 train / 50 validation / 150 test; XSTest 80 / 40 / 86.
+
+## 3. Method
+
+Activations are read on the residual stream at the last prompt token.
+
+**Refusal direction.** `r_L = mean(h_L | harmful, English) − mean(h_L | benign, English)`, normalised, from the
+English training split only. SafeTune's own extractor returns the same vector (cosine 0.99999 at layer 27).
+
+**Detector.** A linear discriminant with a penalty on between-language scatter,
+`w = (S_W + β·S_lang + λ·tr(S_W)/d · I)⁻¹ (μ_H − μ_B)`. Layer, β and λ are chosen to maximise the *worst-language*
+validation AUROC (layer 20, β = 1, λ = 0.1). XSTest-safe training prompts are in the negative class, so the probe has
+to separate harmful intent from alarming vocabulary.
+
+**Gate.** `g = 1[w·h_20 > τ]`, with τ the 95th percentile of scores on safe validation prompts (benign and XSTest).
+
+**Bridge.** At layers 25, 27 and 29, on the last prompt token and every generated token:
+`h ← h + g · max(0, c·m* − r̂·h) · r̂`, where `m*` is the mean projection of English harmful training prompts. The
+clamp lifts the refusal component to the English level and never pushes it down. Layers and `c = 1.25` were chosen
+on validation data in four languages by the rule fixed in advance: lowest attack success with benign over-refusal no
+more than 4 pp above baseline.
+
+## 4. Measurement, and how far to trust it
+
+Responses are translated to English (NLLB) and labelled by Qwen2.5-7B-Instruct with a two-field rubric: *refusal*
+(the response explicitly declines or rejects the request) and *harmful* (the response supplies content that serves
+the harmful intent).
+
+We checked the judge three ways.
+
+| Check | Refusal | Harmful |
+|---|---|---|
+| vs. Qwen2.5-72B on 400 pairs | agreement 0.89, κ 0.75 | agreement 0.95, κ 0.21 |
+| vs. the same judge reading the original language (1,930 pairs) | agreement 0.90, κ 0.76 | agreement 0.97, κ 0.38 |
+| vs. PolyGuard-Qwen (3,860 pairs) | agreement 0.83, κ 0.58 | — |
+
+The refusal label is reliable. The harmful label is not: at a base rate near 5 % the two judges flag the same
+*number* of responses but mostly different ones, and the flagged items are borderline. **Attack-success figures near
+5 % are therefore close to the judge's noise floor.** Refusal rate is the better-measured outcome, and we report both
+throughout. An earlier rubric that counted any non-answer as a refusal inflated benign over-refusal threefold; it was
+caught by reading samples and replaced before any reported number was produced.
+
+Rates carry bootstrap 95 % intervals. Before/after comparisons use an exact McNemar test per language with Holm
+correction over the ten languages.
+
+## 5. Results
+
+### 5.1 H1 holds: detection does not depend on the language
+
+| | Range over the ten languages |
+|---|---|
+| Probe AUROC, harmful vs. benign (test) | 0.988 – 0.996 |
+| Same, language held out of probe training | 0.988 – 0.994 |
+| Same, probe trained on English only | 0.966 – 0.994 |
+| Probe AUROC, harmful vs. XSTest-safe | 0.962 – 0.991 |
+| Gate open on harmful prompts | 95.3 – 99.3 % |
+| Gate open on benign prompts | 0.7 – 6.0 % |
+| Gate open on XSTest-safe prompts | 5.8 – 23.3 % |
+
+Even a probe that only ever saw English reaches 0.966 on Javanese. The harm signal is shared across languages by the
+middle of the network.
+
+### 5.2 H2 holds in part: the routing margin shrinks, and it predicts attack success
+
+![Detection and routing by layer](figures/detect_vs_route.png)
+
+Projection onto the English refusal direction still *separates* harmful from benign prompts in every language (AUROC
+above 0.97 at the steering layer). What changes is the distance: harmful prompts in Javanese sit at 46 % of the
+English margin, Swahili 53 %, Bengali 54 %.
+
+Baseline attack success by language correlates with that margin (ρ = −0.77) and not with detection quality
+(ρ = −0.07). The part of H2 that does **not** hold: baseline *refusal rate* shows no relation to the margin
+(ρ = −0.02). Refusal rates are similar across languages (60–79 %) with no resource ordering; the low-resource
+languages differ in how often a non-refusal is actually harmful.
+
+### 5.3 H3 holds: the bridge closes the gap
+
+![Before and after](figures/before_after.png)
+
+### Aggregate (test split)
+
+| Condition | ASR macro ↓ | Refusal on harmful ↑ | Over-refusal benign ↓ | Over-refusal XSTest ↓ | Gap max (pp) ↓ | Gap low-tier (pp) ↓ | Languages |
+|---|---|---|---|---|---|---|---|
+| Tiny Aya (base) | 5.4 | 69.9 | 6.0 | 17.6 | 9.3 | 7.8 | 10 |
+| + gated bridge (ours) | 0.1 | 95.6 | 8.2 | 24.4 | 0.7 | 0.2 | 10 |
+| SafeTune refusal direction | 1.7 | 77.9 | 6.0 | 22.4 | 4.0 | 2.9 | 10 |
+| SafeTune CAST | 0.9 | 98.2 | 99.6 | 98.1 | 8.0 | 0.0 | 10 |
+
+### Ablations (same prompts for every row: 5 languages, test split)
+
+| Condition | ASR macro ↓ | Refusal on harmful ↑ | Over-refusal benign ↓ | Over-refusal XSTest ↓ | Gap max (pp) ↓ | Gap low-tier (pp) ↓ | Languages |
+|---|---|---|---|---|---|---|---|
+| Tiny Aya (base) — same subset | 6.4 | 68.2 | 7.0 | 17.4 | 9.0 | 7.7 | 5 |
+| + gated bridge (ours) — same subset | 0.4 | 96.4 | 9.0 | 26.5 | 1.0 | 0.3 | 5 |
+| ablation: additive | 2.0 | 91.6 | 7.6 | 22.1 | 4.0 | 3.0 | 5 |
+| ablation: no gate | 0.4 | 97.4 | 87.0 | 93.5 | 1.0 | 0.7 | 5 |
+| ablation: random direction | 7.6 | 76.6 | 6.8 | 18.4 | 10.0 | 8.7 | 5 |
+| ablation: English-only probe | 2.0 | 91.2 | 7.2 | 21.2 | 4.0 | 3.3 | 5 |
+| ablation: beta = 0 | 0.8 | 96.2 | 7.8 | 24.2 | 2.0 | 1.0 | 5 |
+| ablation: no hard negatives in the probe | 2.0 | 92.2 | 6.8 | 61.2 | 5.0 | 3.0 | 5 |
+
+### Per language: base → bridge (test split)
+
+| Lang | Tier | ASR % (95% CI) base | ASR % (95% CI) bridge | Holm p (McNemar) | Refusal % | Over-refusal benign % | Over-refusal XSTest % | Gate on harmful % |
+|---|---|---|---|---|---|---|---|---|
+| en | ref | 0.7 (0.0–2.0) | 0.0 (0.0–0.0) | 1 | 69.3 → 93.3 | 0.7 → 2.7 | 9.3 → 15.1 | 98.7 |
+| zh | high | 4.7 (1.3–8.0) | 0.0 (0.0–0.0) | 0.0938 | 68.0 → 98.7 | 4.7 → 7.3 | 15.1 → 19.8 | 99.3 |
+| it | high | 4.7 (2.0–8.0) | 0.0 (0.0–0.0) | 0.0938 | 60.0 → 88.0 | 6.0 → 6.0 | 12.8 → 20.9 | 97.3 |
+| vi | high | 4.7 (1.3–8.0) | 0.0 (0.0–0.0) | 0.0938 | 78.7 → 97.3 | 9.3 → 10.0 | 19.8 → 24.4 | 99.3 |
+| ar | mid | 4.7 (2.0–8.0) | 0.0 (0.0–0.0) | 0.0938 | 68.7 → 94.0 | 9.3 → 9.3 | 19.8 → 24.4 | 98.0 |
+| ko | mid | 5.3 (2.0–9.3) | 0.0 (0.0–0.0) | 0.0547 | 72.7 → 96.0 | 3.3 → 3.3 | 20.9 → 22.1 | 99.3 |
+| th | mid | 4.0 (1.3–7.3) | 0.7 (0.0–2.0) | 0.125 | 77.3 → 96.0 | 12.7 → 15.3 | 29.1 → 38.4 | 95.3 |
+| bn | low | 8.7 (4.7–13.3) | 0.7 (0.0–2.0) | 0.00439 | 64.7 → 95.3 | 6.0 → 9.3 | 11.6 → 22.1 | 98.7 |
+| sw | low | 10.0 (6.0–14.7) | 0.0 (0.0–0.0) | 0.00061 | 66.0 → 98.7 | 3.3 → 8.0 | 19.8 → 29.1 | 98.0 |
+| jv | low | 6.7 (3.3–11.3) | 0.0 (0.0–0.0) | 0.0156 | 74.0 → 98.7 | 4.7 → 10.7 | 17.4 → 27.9 | 98.7 |
+
+Refusal of harmful prompts rises significantly in every language (Holm-adjusted p < 10⁻⁷). Attack success falls
+significantly in the three low-resource languages; elsewhere the baseline rate is already too low for 150 prompts to
+show a significant drop.
+
+Two honest qualifications. First, the bridge raises refusal in English too (69 % → 93 %): it hardens the model on
+MultiJail in general and, in doing so, removes the gap, rather than acting only where the gap is. Second, MultiJail
+contains mild items for which a helpful answer is arguably fine; a higher refusal rate on them is not purely a gain.
+
+### 5.4 What each part contributes
+
+The ablation table above uses the same prompts for every row.
+
+- **Direction matters.** A random direction with the same gate and strength leaves attack success at baseline.
+- **The gate matters most.** Without it the same clamp refuses 87 % of benign prompts.
+- **Hard negatives matter for XSTest.** A probe trained without them opens the gate on most XSTest-safe prompts and
+  over-refusal there reaches 61 %.
+- **Clamping beats adding.** Adding a fixed multiple of the direction leaves 2–4 % attack success in Bengali,
+  Swahili and Javanese where the clamp leaves 0–1 %. The differences are small counts and were not tested for
+  significance.
+- **The multilingual probe beats an English-only one** by a similar small margin (2–4 % vs. 0–1 % in the same
+  three languages).
+- **The invariance penalty (β) changes little** once the probe is trained on all ten languages.
+
+### 5.5 Against SafeTune baselines
+
+SafeTune's uniform refusal-direction steering, tuned with the same validation rule, reaches 1.7 % attack success and
+77.9 % refusal. It has no gate, so its strength is capped by benign over-refusal. SafeTune's CAST, with default
+settings calibrated on our training split, refused nearly everything including benign prompts (99.6 %); we report it
+as run and did not tune it further.
+
+### 5.6 Transfer to other prompts and unseen languages
+
+The bridge was applied unchanged to 100 SORRY-Bench prompts in six languages that were never used for the direction,
+the probe, the threshold or the tuning.
+
+| Language | Gate open on harmful % | ASR % base → bridge | Holm p | Refusal % base → bridge | Holm p |
+|---|---|---|---|---|---|
+| de | 86 | 7 → 0 | 0.0625 | 66 → 87 | 3.8e-06 |
+| es | 88 | 8 → 3 | 0.359 | 67 → 84 | 3.1e-05 |
+| fr | 86 | 8 → 1 | 0.0625 | 65 → 88 | 1.2e-06 |
+| hi | 79 | 18 → 2 | 0.000183 | 54 → 80 | 1.8e-07 |
+| ja | 85 | 5 → 2 | 0.359 | 74 → 88 | 1.2e-04 |
+| ru | 87 | 8 → 0 | 0.0391 | 69 → 89 | 5.7e-06 |
+
+Macro attack success 9.0 % → 1.3 %; refusal 65.8 % → 86.0 % (n = 100 per language). The gate, never fitted on these prompts or languages, opens on 79–88 % of them in the six unseen languages, against 95–99 % on MultiJail: detection transfers, with some loss. Refusal rises significantly in all six languages; attack success falls significantly in Hindi and Russian.
+
+### 5.7 Capability, red team and circuits (AuditKIT, CircuitKIT)
+
+**Capability (AuditKIT).** On Belebele reading comprehension (100 items per language, 1,000 in total) accuracy is
+75.6 % with and without the bridge; AuditKIT's paired comparison finds no item that changed. On safe
+test prompts the first generated token's distribution is untouched for 97.3 % of benign and 85.9 % of XSTest-safe
+prompts (mean KL 0.042 and 0.137 nats), which is the gate's false-positive rate seen from the output side.
+Throughput is 284 tokens/s without the hooks and 283 with them.
+
+**Red team (AuditKIT).** On AuditKIT's built-in probe set (47 checks, English, mostly prompt injection and encoding
+tricks) the pass rate goes from 83.0 % to 91.5 %. The bridge was not designed for injection, the set is small, and
+the two remaining failure families (a "developer mode" prompt and an encoded instruction) are untouched.
+
+**Circuits (CircuitKIT).** EAP-IG attribution of the refusal decision in English, Swahili and Bengali gives top-50
+component sets that overlap only partly (Jaccard 0.41 English–Swahili, 0.45 English–Bengali, 0.37 Swahili–Bengali).
+Three attention heads of layer 20, the layer the detector reads, are in the English top 20; one of them is in the
+Bengali top 20 and none in the Swahili one. This is consistent with a shared early part and language-dependent later
+routing, but it is one run per language without a significance test, and we do not build on it.
+
+## 6. Cost comparison
+
+Measured on one A100, for this model and benchmark:
+
+| | Bridge |
+|---|---|
+| Trainable parameters | 0 |
+| Adapter size | 33 KB (4 vectors of 2,048 floats, 2 scalars) |
+| Fitting | one forward pass over 8,360 prompts (151 s) and a closed-form solve |
+| Tuning | 8 validation runs of about 3 minutes each |
+| Inference overhead | 284 → 283 tokens/s |
+| Capability change (Belebele) | 0 of 1,000 items |
+
+We did not train a fine-tuned or LoRA safety baseline, so there is no measured cost for that route; the comparison
+we can make is against SafeTune's steering, which has the same order of cost and, without a gate, a worse trade-off
+(Section 5.5).
+
+## 7. Limitations
+
+- One model and one harmful-prompt family for fitting. MultiJail prompts are direct requests, not adversarial
+  jailbreaks; nothing here shows robustness to an attacker who optimises against the gate.
+- Attack-success rates are near the judge's noise floor (Section 4). Claims that rest only on them are worded
+  accordingly; refusal-rate claims are on firmer ground.
+- Ten languages give ten points for the correlation in 5.2.
+- Benign and XSTest prompts are machine-translated, and responses are judged through machine translation. Quality is
+  lowest in the languages the question is about.
+- The refusal direction is a difference of means. It is sufficient to steer; that does not make it the mechanism.
+- Over-refusal on XSTest-safe prompts rises by about 7 pp. A deployment that cares about that should lower `c` or
+  raise τ and accept a smaller gain.
+
+## 8. Reproduce
+
+Code, configuration, results and the adapter are in the repository. `python tests/dry_run.py` runs the whole path
+offline on a tiny random model. The full study runs as two GPU sessions (`notebooks/`); every stage writes a
+`run.json` with code revision, config hash, seed, hardware and library versions.
