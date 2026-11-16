@@ -520,22 +520,31 @@ def run_a(cfg: Cfg, quick: bool = False):
 def run_b(cfg: Cfg, quick: bool = False):
     from . import kits
 
-    S = Session(cfg)
-    n = 8 if quick else None
-    for fn in (kits.safetune_baselines, kits.capability, kits.audit_redteam, kits.circuits):
-        try:
-            fn(cfg, S, n=n)
-        except Exception as e:  # noqa: BLE001 - kit stages are independent of each other
-            import traceback
+    import subprocess
+    import sys
 
-            traceback.print_exc()
-            print(f"[warn] {fn.__name__} failed: {type(e).__name__}: {e}")
+    assert all(hasattr(kits, k) for k in KITS)
+    for k in KITS:      # one process per kit stage: each starts with clean GPU and host memory
+        rc = subprocess.run([sys.executable, "-u", "-m", "xlrb.cli", "kit", "--name", k]
+                            + (["--quick"] if quick else [])).returncode
+        if rc:
+            print(f"[warn] kit stage {k} exited with code {rc}")
     do_report(cfg)
+
+
+KITS = ("safetune_baselines", "capability", "audit_redteam", "circuits")
+
+
+def run_kit(cfg: Cfg, name: str, quick: bool = False):
+    from . import kits
+
+    getattr(kits, name)(cfg, Session(cfg), n=8 if quick else None)
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("stage", choices=["bench", "acts", "fit", "tune", "report", "ood", "run_a", "run_b"])
+    ap.add_argument("stage", choices=["bench", "acts", "fit", "tune", "report", "ood", "run_a", "run_b", "kit"])
+    ap.add_argument("--name", default=None, choices=KITS)
     ap.add_argument("--config", default=None)
     ap.add_argument("--model", default=None)
     ap.add_argument("--limit", type=int, default=None)
@@ -564,6 +573,8 @@ def main():
         do_report(cfg)
     elif a.stage == "ood":
         do_ood(cfg, Session(cfg), n=a.limit or 100)
+    elif a.stage == "kit":
+        run_kit(cfg, a.name, a.quick)
     elif a.stage == "run_a":
         run_a(cfg, a.quick)
     elif a.stage == "run_b":

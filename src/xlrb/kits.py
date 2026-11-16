@@ -199,7 +199,7 @@ def capability(cfg: Cfg, S, n=None):
     """Capability retention: Belebele accuracy (AuditKIT), first-token KL on safe prompts, throughput."""
     import torch
 
-    from .activations import first_token_logprobs, generate
+    from .activations import first_token_kl, generate
     from .bridge import Bridge
     from .cli import final_bridge, stage, tune_name
     from .common import wait_for
@@ -239,9 +239,7 @@ def capability(cfg: Cfg, S, n=None):
         safe = [x for x in load_bench(cfg) if x["split"] == "test" and x["label"] != "harmful"]
         if n:
             safe = safe[: 20 * n]
-        P = first_token_logprobs(model, tok, [x["text"] for x in safe], cfg.act_batch)
-        Q = first_token_logprobs(model, tok, [x["text"] for x in safe], cfg.act_batch, ctx=br)
-        kl = (P.exp() * (P - Q)).sum(-1).numpy()
+        kl = np.array(first_token_kl(model, tok, [x["text"] for x in safe], br))
         for lab in ("benign", "xstest_safe"):
             m = np.array([x["label"] == lab for x in safe])
             res[f"kl_first_token_{lab}"] = {"mean": float(kl[m].mean()), "p95": float(np.quantile(kl[m], 0.95)),

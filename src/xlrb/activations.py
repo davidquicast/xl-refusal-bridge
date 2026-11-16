@@ -102,6 +102,25 @@ def generate(model, tok, prompts: list[str], max_new_tokens: int = 128, batch: i
     return (outs, gates) if return_gate else outs
 
 
+def first_token_kl(model, tok, prompts: list[str], ctx, batch: int = 16) -> list[float]:
+    """KL(base || steered) of the first generated token, per prompt. Computed batch by batch on the
+    device: the full [N, vocab] matrices do not fit in host memory for a 250k-token vocabulary."""
+    import torch
+
+    dev = next(model.parameters()).device
+    out: list[float] = []
+    for s in range(0, len(prompts), batch):
+        enc = encode(tok, prompts[s: s + batch], dev)
+        with torch.no_grad():
+            P = torch.log_softmax(model(**enc).logits[:, -1].float(), -1)
+            with ctx:
+                if hasattr(ctx, "reset"):
+                    ctx.reset()
+                Q = torch.log_softmax(model(**enc).logits[:, -1].float(), -1)
+        out += (P.exp() * (P - Q)).sum(-1).cpu().tolist()
+    return out
+
+
 def first_token_logprobs(model, tok, prompts: list[str], batch: int = 32, ctx=None):
     """Log-probabilities of the first generated token, [N, V] float32 on CPU (for the KL metric)."""
     import torch
