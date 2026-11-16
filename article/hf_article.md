@@ -12,8 +12,7 @@ Lexsi kits chained: CuratorKIT → SafeTune → CircuitKIT → AuditKIT
 training data, here Bengali, Swahili and Javanese). Asked for something harmful in Javanese, Tiny Aya complies more
 often than when asked the same thing in English.
 
-**What we found.** Looking inside the model, the part that *recognises* a harmful request works equally well in all
-ten languages we tested. What gets weaker outside English is the internal signal that turns that recognition into a
+**What we found.** Looking inside the model, the part that *recognises* a harmful request works equally well in all ten languages we tested (English, Chinese, Italian, Vietnamese, Arabic, Korean, Thai, Bengali, Swahili and Javanese). What gets weaker outside English is the internal signal that turns that recognition into a
 refusal. In Javanese that signal has 46 % of its English strength.
 
 **What we built.** A tiny add-on (33 KB, no retraining) with two parts: a detector that checks whether the request
