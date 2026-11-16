@@ -26,8 +26,7 @@ layers 25, 27 and 29. No weights are changed. When the gate is closed the forwar
 | Worst-language gap to English (attack success) | 9.3 pp | 0.7 pp |
 | Belebele accuracy | 75.6 % | 75.6 % |
 
-Attack-success rates near 5 % are close to the noise floor of the automatic judge; the refusal rate is the
-better-measured outcome. Over-refusal on alarming-but-safe prompts rises by about 7 pp. See the article in the code
+Single harmful verdicts of the automatic judge are noisy; the refusal rate is the better-measured outcome. Over-refusal on alarming-but-safe prompts rises by about 7 pp. See the article in the code
 repository for method, ablations, transfer to unseen languages and limitations.
 
 All 25,220 test responses were re-labelled by a ten-times-larger judge (Qwen2.5-72B, same rubric): attack
