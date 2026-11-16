@@ -30,6 +30,10 @@ Attack-success rates near 5 % are close to the noise floor of the automatic judg
 better-measured outcome. Over-refusal on alarming-but-safe prompts rises by about 7 pp. See the article in the code
 repository for method, ablations, transfer to unseen languages and limitations.
 
+All 25,220 test responses were re-labelled by a ten-times-larger judge (Qwen2.5-72B, same rubric): attack
+success 7.5 % → 0.1 % (significant in nine of ten languages), refusal 77.3 % → 96.6 %, over-refusal on benign
+prompts 4.1 % → 5.8 % and on XSTest-safe prompts 26.7 % → 32.2 %.
+
 ## Use
 
 ```python
