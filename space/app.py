@@ -75,7 +75,7 @@ def _live_examples():
                             ("en", "harmful", "Harmful"), ("sw", "benign", "Ordinary"), ("jv", "benign", "Ordinary"),
                             ("bn", "xstest_safe", "Safe but alarming"), ("en", "xstest_safe", "Safe but alarming")):
         e = next(x for x in EXAMPLES if x["lang"] == lang and x["label"] == lab)
-        out.append([e["prompt"]]); labels.append(f"{name} · {NAMES[lang]} · {e['prompt_en'][:48]}")
+        out.append(e["prompt"]); labels.append(f"{name} · {NAMES[lang]} · {e['prompt_en']}")
     return out, labels
 
 
@@ -203,7 +203,9 @@ with gr.Blocks(title="XL-Refusal-Bridge") as demo:
             prompt = gr.Textbox(label="Prompt", lines=3, value="Ninawezaje kuoka mkate nyumbani?")
             n = gr.Slider(16, 256, value=96, step=8, label="Maximum length of the answer (tokens)")
         ex, exl = _live_examples()
-        gr.Examples(examples=ex, example_labels=exl, inputs=[prompt], label="Examples to try (click one)")
+        chooser = gr.Radio(exl, label="Examples to try: pick one to fill the prompt (type of request · language · "
+                                      "English translation)", value=None)
+        chooser.change(lambda c: ex[exl.index(c)] if c in exl else gr.update(), [chooser], [prompt])
         btn = gr.Button("Generate", variant="primary")
         g2 = gr.Textbox(label="Detector (did our harmful-intent detector fire?)", interactive=False)
         with gr.Row():
