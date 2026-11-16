@@ -450,6 +450,13 @@ def do_report(cfg: Cfg):
                     "rr": paired(conds["base"], rows, "refusal", "harmful"),
                     "orr_benign": paired(conds["base"], rows, "refusal", "benign"),
                     "orr_xstest": paired(conds["base"], rows, "refusal", "xstest_safe")}
+        # Ablations run on a subset; base and bridge restricted to the same prompts for a fair table.
+        abl = next((c for c in conds if c.startswith("abl_")), None)
+        if abl and "base" in conds:
+            ids = {r["id"] for r in conds[abl]}
+            res["ablation_subset"] = {c: summarize([r for r in conds[c] if r["id"] in ids])
+                                      for c in ("base", "bridge") if c in conds}
+            res["ablation_subset"]["n_prompts"] = len(ids)
         if "base" in conds:
             res["judge_validity_native_vs_pivot"] = judge_agreement(conds["base"])
         try:

@@ -23,10 +23,15 @@ def tables(res: dict) -> str:
            "| Condition | ASR macro ↓ | Refusal on harmful ↑ | Over-refusal benign ↓ | Over-refusal XSTest ↓ | Gap max (pp) ↓ | Gap low-tier (pp) ↓ | Languages |",
            "|---|---|---|---|---|---|---|---|"]
     order = [c for c in COND_NAME if c in conds] + [c for c in conds if c not in COND_NAME]
-    for c in order:
-        s = conds[c]
-        out.append(f"| {COND_NAME.get(c, c)} | {pct(s['asr_macro'])} | {pct(s['rr_macro'])} | {pct(s['orr_benign_macro'])} | "
-                   f"{pct(s['orr_xstest_macro'])} | {pct(s.get('gap_max'))} | {pct(s.get('gap_low_tier'))} | {len(s['per_lang'])} |")
+    row = lambda name, s: (  # noqa: E731
+        f"| {name} | {pct(s['asr_macro'])} | {pct(s['rr_macro'])} | {pct(s['orr_benign_macro'])} | "
+        f"{pct(s['orr_xstest_macro'])} | {pct(s.get('gap_max'))} | {pct(s.get('gap_low_tier'))} | {len(s['per_lang'])} |")
+    out += [row(COND_NAME.get(c, c), conds[c]) for c in order if not c.startswith("abl_")]
+    if any(c.startswith("abl_") for c in conds):
+        sub_ = res.get("ablation_subset", {})
+        out += ["\n### Ablations (same prompts for every row: 5 languages, test split)\n", out[1], out[2]]
+        out += [row(COND_NAME[c] + " — same subset", sub_[c]) for c in ("base", "bridge") if c in sub_]
+        out += [row(COND_NAME.get(c, c), conds[c]) for c in order if c.startswith("abl_")]
     if "base" in conds and "bridge" in conds:
         b, t = conds["base"]["per_lang"], conds["bridge"]["per_lang"]
         pv = res.get("paired_vs_base", {}).get("bridge", {}).get("asr", {})
@@ -56,7 +61,7 @@ def make(res: dict, analysis: dict | None, tune: dict | None, out_dir: str | Pat
     conds = res["conditions"]
     if "base" in conds:
         langs = [l for l in LANG_CODES if l in conds["base"]["per_lang"]]
-        show = [c for c in ("base", "st_refdir", "st_cast", "bridge") if c in conds]
+        show = [c for c in ("base", "st_refdir", "bridge") if c in conds]   # CAST is off the scale; see the table
         fig, axes = plt.subplots(1, 3, figsize=(15, 4.2))
         for ax, (key, title) in zip(axes, (("asr", "Attack success rate on harmful prompts (↓)"),
                                            ("orr_benign", "Over-refusal on benign prompts (↓)"),
@@ -121,6 +126,7 @@ def main(results_dir: str, fit_dir: str, out_dir: str):
     res = json.loads(Path(results_dir, "metrics.json").read_text())
     an = Path(fit_dir, "analysis.json")
     tn = Path(fit_dir, "bridge", "tune_table.json")
+    tn = tn if tn.exists() else Path(fit_dir, "tune_table.json")
     made = make(res, json.loads(an.read_text()) if an.exists() else None,
                 json.loads(tn.read_text()) if tn.exists() else None, out_dir)
     Path(out_dir, "tables.md").write_text(tables(res))
