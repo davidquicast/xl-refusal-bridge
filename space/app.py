@@ -11,6 +11,26 @@ import gradio as gr
 
 EXAMPLES = json.loads(Path(__file__).with_name("examples.json").read_text())
 LANGS = sorted({e["lang"] for e in EXAMPLES}, key=["en", "zh", "it", "vi", "ar", "ko", "th", "bn", "sw", "jv"].index)
+NAMES = {"en": "English", "zh": "Chinese", "it": "Italian", "vi": "Vietnamese", "ar": "Arabic", "ko": "Korean",
+         "th": "Thai", "bn": "Bengali", "sw": "Swahili", "jv": "Javanese"}
+# Lead with the cases the adapter changed: base did not refuse, bridge did.
+EXAMPLES.sort(key=lambda e: not (e["label"] == "harmful" and not e["base_verdict"]["refusal"]
+                                 and e["bridge_verdict"]["refusal"]))
+RESULTS = """
+| Test split, ten languages | Tiny Aya | + bridge |
+|---|---|---|
+| Harmful responses to harmful prompts | 5.4 % | **0.1 %** |
+| Harmful prompts refused | 69.9 % | **95.6 %** |
+| Benign prompts refused | 6.0 % | 8.2 % |
+| Safe-but-alarming prompts refused (XSTest) | 17.6 % | 24.4 % |
+| Worst-language gap to English | 9.3 pp | **0.7 pp** |
+| Reading comprehension (Belebele) | 75.6 % | 75.6 % |
+
+A ten-times-larger judge gives the same picture (7.5 % → 0.1 % harmful responses).
+[Article and code](https://github.com/davidquicast/xl-refusal-bridge) ·
+[adapter](https://huggingface.co/davidquicast/tiny-aya-xl-refusal-bridge) ·
+[benchmark](https://huggingface.co/datasets/davidquicast/xl-refusal-bench)
+"""
 LABELS = {"harmful": "harmful (MultiJail)", "benign": "benign (Alpaca)", "xstest_safe": "safe but alarming (XSTest)"}
 ADAPTER = os.environ.get("XLRB_ADAPTER", "davidquicast/tiny-aya-xl-refusal-bridge")
 
@@ -71,12 +91,17 @@ with gr.Blocks(title="XL-Refusal-Bridge") as demo:
         "Tiny Aya recognises harmful requests equally well in ten languages, but the signal that turns recognition "
         "into refusal is weaker in low-resource ones. A language-invariant probe gates a clamp along the refusal "
         "direction: no fine-tuning, a 33 KB adapter, and no change when the gate is closed.")
+    with gr.Accordion("Results at a glance", open=True):
+        gr.Markdown(RESULTS)
     with gr.Tab("Recorded examples"):
-        gr.Markdown("Responses from the evaluation run (test split). For harmful prompts only explicit refusals are "
-                    "shown; any other response is withheld. Verdicts are the automatic judge's.")
+        gr.Markdown("Responses from the evaluation run (test split), sixteen per language. Harmful-prompt examples "
+                    "start with the cases the bridge changed (base did not refuse, bridge did). For harmful prompts "
+                    "only explicit refusals are shown; any other response is withheld. Verdicts are the automatic "
+                    "judge's. The gate line shows whether the detector fired; when it is closed the two responses "
+                    "are identical by construction.")
         with gr.Row():
-            lang = gr.Dropdown(LANGS, value="sw", label="Language")
-            label = gr.Dropdown(list(LABELS), value="harmful", label="Prompt class")
+            lang = gr.Dropdown([(NAMES[l], l) for l in LANGS], value="sw", label="Language")
+            label = gr.Dropdown([(v, k) for k, v in LABELS.items()], value="harmful", label="Prompt class")
             idx = gr.Slider(0, 7, value=0, step=1, label="Example")
         p, pe = gr.Textbox(label="Prompt"), gr.Textbox(label="Prompt (English)")
         gate = gr.Textbox(label="Gate")
