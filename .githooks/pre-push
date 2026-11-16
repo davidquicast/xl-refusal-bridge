@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Last gate before anything leaves the machine: scan every commit being pushed for private data
+# and for agent attribution in commit messages.
+pat='hf_[A-Za-z0-9]{30,}|/home/[a-z]+/|/content/drive|xl-refusal-bridge-ops|COHERE_API_KEY=|[A-Za-z0-9._%+-]+@gmail\.com'
+fail=0
+while read -r _ local_sha _ remote_sha; do
+  [ "$local_sha" = "0000000000000000000000000000000000000000" ] && continue
+  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then range="$local_sha"; else range="$remote_sha..$local_sha"; fi
+  if git log --format='%an <%ae>%n%cn <%ce>%n%B' "$range" | grep -Eiq 'co-authored-by|claude|anthropic|noreply@anthropic'; then
+    echo "pre-push: agent attribution found in commit metadata." >&2; fail=1
+  fi
+  if git grep -EnI "$pat" "$local_sha" -- . ':!.githooks' >/dev/null; then
+    echo "pre-push: possible private data in tree:" >&2
+    git grep -EnI "$pat" "$local_sha" -- . ':!.githooks' | head -5 >&2; fail=1
+  fi
+done
+exit $fail

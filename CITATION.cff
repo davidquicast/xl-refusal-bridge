@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+title: "XL-Refusal-Bridge: detection and routing of refusal across languages in Tiny Aya"
+authors:
+  - alias: davidquicast
+type: software
+license: MIT
+date-released: 2026-11-16
