@@ -72,6 +72,9 @@ upload_log()
 if rc == 0:
     rc = sh(f"python -u -m xlrb.cli run_{SESSION}", {**env, "XLRB_WORK": "/content/xlrb_work"})
     open(LOG, "a").write(f"[bootstrap] full run exit code {rc}\n")
+    if rc == 0 and f"ood_{SESSION}" in flags:   # held-out prompts and unseen languages
+        rc = sh("python -u -m xlrb.cli ood", {**env, "XLRB_WORK": "/content/xlrb_work"})
+        open(LOG, "a").write(f"[bootstrap] ood exit code {rc}\n")
 else:
     print("[bootstrap] smoke test failed; full run not started")
 upload_log()
